@@ -1,0 +1,485 @@
+import {
+  activateDevice,
+  createRecord,
+  getSession,
+  getSummary,
+  listRecords,
+  logout,
+  voidRecord
+} from './api.js';
+import {
+  formatArs,
+  formatCommercialDate,
+  formatInteger,
+  formatRecordStatus,
+  formatRecordType
+} from './format.js';
+import { parsePositiveIntegerText, validateSaleFields } from './validation.js';
+
+const dom = {
+  activationView: document.querySelector('#activation-view'),
+  activationForm: document.querySelector('#activation-form'),
+  activationUser: document.querySelector('#activation-user'),
+  activationCode: document.querySelector('#activation-code'),
+  activationSubmit: document.querySelector('#activation-submit'),
+  activationError: document.querySelector('#activation-error'),
+  appView: document.querySelector('#app-view'),
+  sessionBadge: document.querySelector('#session-badge'),
+  summaryTotal: document.querySelector('#summary-total'),
+  summaryLines: document.querySelector('#summary-lines'),
+  showEntry: document.querySelector('#show-entry'),
+  showRecords: document.querySelector('#show-records'),
+  entrySection: document.querySelector('#entry-section'),
+  recordsSection: document.querySelector('#records-section'),
+  saleForm: document.querySelector('#sale-form'),
+  gramsInput: document.querySelector('#grams-input'),
+  amountInput: document.querySelector('#amount-input'),
+  amountPreview: document.querySelector('#amount-preview'),
+  saleSubmit: document.querySelector('#sale-submit'),
+  saleError: document.querySelector('#sale-error'),
+  logoutButton: document.querySelector('#logout-button'),
+  reloadRecords: document.querySelector('#reload-records'),
+  recordsState: document.querySelector('#records-state'),
+  recordsList: document.querySelector('#records-list'),
+  loadMoreRecords: document.querySelector('#load-more-records'),
+  voidDialog: document.querySelector('#void-dialog'),
+  voidCopy: document.querySelector('#void-copy'),
+  voidForm: document.querySelector('#void-form'),
+  voidConfirmation: document.querySelector('#void-confirmation'),
+  voidError: document.querySelector('#void-error'),
+  voidCancel: document.querySelector('#void-cancel'),
+  voidSubmit: document.querySelector('#void-submit'),
+  liveRegion: document.querySelector('#live-region')
+};
+
+const state = {
+  user: null,
+  isSubmittingSale: false,
+  saleIdempotencyKey: null,
+  lastSalePayload: null,
+  recordsOffset: 0,
+  recordsLimit: 30,
+  hasMoreRecords: false,
+  recordPendingVoid: null
+};
+
+init();
+
+function init() {
+  registerServiceWorker();
+  bindEvents();
+  bootSession();
+}
+
+function bindEvents() {
+  dom.activationForm.addEventListener('submit', handleActivationSubmit);
+  dom.saleForm.addEventListener('submit', handleSaleSubmit);
+  dom.amountInput.addEventListener('input', handleAmountInput);
+  dom.gramsInput.addEventListener('input', handleSaleInputChange);
+  dom.amountInput.addEventListener('input', handleSaleInputChange);
+  dom.showEntry.addEventListener('click', () => switchView('entry'));
+  dom.showRecords.addEventListener('click', () => switchView('records'));
+  dom.reloadRecords.addEventListener('click', () => loadRecords({ reset: true }));
+  dom.loadMoreRecords.addEventListener('click', () => loadRecords({ reset: false }));
+  dom.logoutButton.addEventListener('click', handleLogout);
+  dom.recordsList.addEventListener('click', handleRecordsClick);
+  dom.voidCancel.addEventListener('click', closeVoidDialog);
+  dom.voidForm.addEventListener('submit', handleVoidSubmit);
+}
+
+async function bootSession() {
+  setActivationBusy(true);
+  try {
+    const session = await getSession();
+    if (session.authenticated) {
+      showApp(session.user);
+      await refreshAppData();
+    } else {
+      showActivation();
+    }
+  } catch (error) {
+    showActivation(error.message);
+  } finally {
+    setActivationBusy(false);
+  }
+}
+
+async function handleActivationSubmit(event) {
+  event.preventDefault();
+  dom.activationError.textContent = '';
+  setActivationBusy(true);
+
+  try {
+    const result = await activateDevice({
+      userName: dom.activationUser.value,
+      activationCode: dom.activationCode.value
+    });
+    dom.activationCode.value = '';
+    showApp(result.user);
+    announce('Dispositivo activado.');
+    await refreshAppData();
+    dom.gramsInput.focus();
+  } catch (error) {
+    dom.activationError.textContent = error.message;
+    announce(error.message);
+  } finally {
+    setActivationBusy(false);
+  }
+}
+
+async function handleSaleSubmit(event) {
+  event.preventDefault();
+  if (state.isSubmittingSale) {
+    return;
+  }
+
+  const gramsRaw = dom.gramsInput.value;
+  const amountRaw = dom.amountInput.value;
+  const validation = validateSaleFields(gramsRaw, amountRaw);
+  if (!validation.ok) {
+    showSaleError(validation.message, validation.field);
+    return;
+  }
+
+  const payload = {
+    grams: gramsRaw,
+    amountArs: amountRaw
+  };
+
+  state.saleIdempotencyKey ||= crypto.randomUUID();
+  state.lastSalePayload = payload;
+  setSaleBusy(true);
+  dom.saleError.textContent = 'Guardando...';
+  announce('Guardando registro.');
+
+  try {
+    const result = await createRecord({
+      ...payload,
+      idempotencyKey: state.saleIdempotencyKey
+    });
+
+    dom.gramsInput.value = '';
+    dom.amountInput.value = '';
+    dom.amountPreview.textContent = '';
+    state.saleIdempotencyKey = null;
+    state.lastSalePayload = null;
+    dom.saleError.textContent = '';
+
+    await refreshAppData();
+    const message = result.result === 'existing' ? 'Registro ya guardado.' : 'Registro guardado.';
+    announce(message);
+    dom.gramsInput.focus();
+  } catch (error) {
+    dom.saleError.textContent = `${error.message} Los datos siguen en el formulario.`;
+    announce(error.message);
+  } finally {
+    setSaleBusy(false);
+  }
+}
+
+function handleAmountInput() {
+  const parsed = parsePositiveIntegerText(dom.amountInput.value, 'Importe total');
+  dom.amountPreview.textContent = parsed.ok ? formatArs(parsed.value) : '';
+}
+
+function handleSaleInputChange() {
+  if (!state.lastSalePayload || state.isSubmittingSale) {
+    return;
+  }
+
+  const unchanged =
+    state.lastSalePayload.grams === dom.gramsInput.value &&
+    state.lastSalePayload.amountArs === dom.amountInput.value;
+
+  if (!unchanged) {
+    state.saleIdempotencyKey = null;
+    state.lastSalePayload = null;
+  }
+}
+
+async function handleLogout() {
+  dom.logoutButton.disabled = true;
+  try {
+    await logout();
+  } finally {
+    state.user = null;
+    showActivation();
+    announce('Sesión cerrada.');
+    dom.logoutButton.disabled = false;
+  }
+}
+
+function handleRecordsClick(event) {
+  const button = event.target.closest('[data-void-record]');
+  if (!button) {
+    return;
+  }
+
+  const record = button.record;
+  openVoidDialog(record);
+}
+
+async function handleVoidSubmit(event) {
+  event.preventDefault();
+  if (!state.recordPendingVoid) {
+    return;
+  }
+
+  dom.voidError.textContent = '';
+  dom.voidSubmit.disabled = true;
+
+  try {
+    await voidRecord({
+      id: state.recordPendingVoid.id,
+      confirmation: dom.voidConfirmation.value
+    });
+    closeVoidDialog();
+    await refreshAppData();
+    announce('Registro anulado.');
+  } catch (error) {
+    dom.voidError.textContent = error.message;
+    announce(error.message);
+  } finally {
+    dom.voidSubmit.disabled = false;
+  }
+}
+
+async function refreshAppData() {
+  await Promise.all([loadSummary(), loadRecords({ reset: true })]);
+}
+
+async function loadSummary() {
+  try {
+    const result = await getSummary();
+    renderSummary(result.summary);
+  } catch (error) {
+    dom.summaryTotal.textContent = 'Sin datos';
+    dom.summaryLines.replaceChildren(summaryLine('Error', error.message));
+  }
+}
+
+async function loadRecords({ reset }) {
+  if (reset) {
+    state.recordsOffset = 0;
+    dom.recordsList.replaceChildren();
+  }
+
+  dom.recordsState.textContent = 'Cargando registros...';
+  dom.loadMoreRecords.hidden = true;
+
+  try {
+    const result = await listRecords({
+      limit: state.recordsLimit,
+      offset: state.recordsOffset
+    });
+
+    if (reset) {
+      dom.recordsList.replaceChildren();
+    }
+
+    renderRecords(result.records, { append: !reset });
+    state.hasMoreRecords = result.pagination.hasMore;
+    state.recordsOffset = result.pagination.nextOffset ?? state.recordsOffset + result.records.length;
+    dom.loadMoreRecords.hidden = !state.hasMoreRecords;
+    dom.recordsState.textContent = dom.recordsList.children.length === 0 ? 'No hay registros.' : '';
+  } catch (error) {
+    dom.recordsState.textContent = error.message;
+  }
+}
+
+function renderSummary(summary) {
+  dom.summaryTotal.textContent = formatArs(summary.totalArs);
+  const lines = [summaryLine('Inversión', formatArs(summary.investmentArs))];
+
+  if (!summary.investmentRecovered) {
+    lines.push(summaryLine('Falta recuperar', formatArs(summary.missingArs), 'is-missing'));
+  } else {
+    lines.push(summaryLine('Inversión recuperada', 'Sí'));
+    lines.push(summaryLine('Ganancia real', formatArs(summary.profitArs), summary.profitArs > 0 ? 'is-profit' : ''));
+  }
+
+  dom.summaryLines.replaceChildren(...lines);
+}
+
+function summaryLine(label, value, className = '') {
+  const row = document.createElement('div');
+  row.className = `summary-line ${className}`.trim();
+
+  const labelElement = document.createElement('span');
+  labelElement.textContent = label;
+
+  const valueElement = document.createElement('strong');
+  valueElement.textContent = value;
+
+  row.append(labelElement, valueElement);
+  return row;
+}
+
+function renderRecords(records, { append }) {
+  const fragment = document.createDocumentFragment();
+  for (const record of records) {
+    fragment.append(createRecordCard(record));
+  }
+
+  if (append) {
+    dom.recordsList.append(fragment);
+  } else {
+    dom.recordsList.replaceChildren(fragment);
+  }
+}
+
+function createRecordCard(record) {
+  const card = document.createElement('article');
+  card.className = `record-card ${record.status === 'anulado' ? 'is-voided' : ''}`.trim();
+
+  const head = document.createElement('div');
+  head.className = 'record-head';
+
+  const amount = document.createElement('p');
+  amount.className = 'record-amount';
+  amount.textContent = formatArs(record.amountArs);
+
+  const pill = document.createElement('span');
+  pill.className = `record-pill ${record.status === 'anulado' ? 'is-voided' : ''}`.trim();
+  pill.textContent = formatRecordStatus(record.status);
+
+  head.append(amount, pill);
+
+  const details = document.createElement('dl');
+  details.className = 'record-details';
+  details.append(
+    detailItem('Tipo', formatRecordType(record.type)),
+    detailItem('Usuario', record.user?.displayName || 'Saldo inicial'),
+    detailItem('Gramos', record.grams === null ? 'Sin informar' : `${formatInteger(record.grams)} g`),
+    detailItem('Fecha', formatCommercialDate(record.commercialDate))
+  );
+
+  card.append(head, details);
+
+  if (record.status === 'anulado') {
+    const voidedBy = record.voidedBy?.displayName || 'Sin informar';
+    card.append(detailNote(`Anulado por ${voidedBy}.`));
+  }
+
+  if (record.type === 'venta' && record.status === 'activo') {
+    const actions = document.createElement('div');
+    actions.className = 'record-actions';
+
+    const button = document.createElement('button');
+    button.className = 'quiet-button';
+    button.type = 'button';
+    button.textContent = 'Anular';
+    button.dataset.voidRecord = record.id;
+    button.record = record;
+
+    actions.append(button);
+    card.append(actions);
+  }
+
+  return card;
+}
+
+function detailItem(label, value) {
+  const wrapper = document.createElement('div');
+  const term = document.createElement('dt');
+  const description = document.createElement('dd');
+
+  term.textContent = label;
+  description.textContent = value;
+  wrapper.append(term, description);
+  return wrapper;
+}
+
+function detailNote(value) {
+  const note = document.createElement('p');
+  note.className = 'input-preview';
+  note.textContent = value;
+  return note;
+}
+
+function openVoidDialog(record) {
+  state.recordPendingVoid = record;
+  dom.voidCopy.textContent = `Para anular ${formatArs(record.amountArs)}, escribí ANULAR.`;
+  dom.voidConfirmation.value = '';
+  dom.voidError.textContent = '';
+  dom.voidDialog.hidden = false;
+  dom.voidConfirmation.focus();
+}
+
+function closeVoidDialog() {
+  state.recordPendingVoid = null;
+  dom.voidDialog.hidden = true;
+  dom.voidConfirmation.value = '';
+  dom.voidError.textContent = '';
+}
+
+function switchView(view) {
+  const records = view === 'records';
+  dom.entrySection.hidden = records;
+  dom.recordsSection.hidden = !records;
+  dom.showEntry.classList.toggle('is-active', !records);
+  dom.showRecords.classList.toggle('is-active', records);
+
+  if (records) {
+    loadRecords({ reset: true });
+  } else {
+    dom.gramsInput.focus();
+  }
+}
+
+function showActivation(message = '') {
+  dom.activationView.hidden = false;
+  dom.appView.hidden = true;
+  dom.sessionBadge.hidden = true;
+  dom.sessionBadge.textContent = '';
+  dom.activationError.textContent = message;
+  dom.activationCode.value = '';
+  dom.activationCode.focus();
+}
+
+function showApp(user) {
+  state.user = user;
+  dom.activationView.hidden = true;
+  dom.appView.hidden = false;
+  dom.sessionBadge.hidden = false;
+  dom.sessionBadge.textContent = user.displayName;
+  switchView('entry');
+}
+
+function showSaleError(message, field) {
+  dom.saleError.textContent = message;
+  dom.gramsInput.setAttribute('aria-invalid', field === 'grams' ? 'true' : 'false');
+  dom.amountInput.setAttribute('aria-invalid', field === 'amount' ? 'true' : 'false');
+  const target = field === 'grams' ? dom.gramsInput : dom.amountInput;
+  target.focus();
+  announce(message);
+}
+
+function setActivationBusy(isBusy) {
+  dom.activationSubmit.disabled = isBusy;
+  dom.activationUser.disabled = isBusy;
+  dom.activationCode.disabled = isBusy;
+  dom.activationSubmit.textContent = isBusy ? 'Activando...' : 'Activar';
+}
+
+function setSaleBusy(isBusy) {
+  state.isSubmittingSale = isBusy;
+  dom.saleSubmit.disabled = isBusy;
+  dom.gramsInput.disabled = isBusy;
+  dom.amountInput.disabled = isBusy;
+  dom.saleSubmit.textContent = isBusy ? 'Guardando...' : 'Registrar';
+  if (!isBusy) {
+    dom.gramsInput.removeAttribute('aria-invalid');
+    dom.amountInput.removeAttribute('aria-invalid');
+  }
+}
+
+function announce(message) {
+  dom.liveRegion.textContent = message;
+}
+
+function registerServiceWorker() {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  }
+}

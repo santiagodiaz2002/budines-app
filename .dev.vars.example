@@ -1,0 +1,6 @@
+# Copiar este archivo como .dev.vars para desarrollo local.
+# No versionar .dev.vars ni reutilizar estos placeholders como credenciales reales.
+
+SANTI_ACTIVATION_CODE="CAMBIAR_CODIGO_PRIVADO_SANTI_NO_USAR_ESTE_VALOR"
+LEANDRO_ACTIVATION_CODE="CAMBIAR_CODIGO_PRIVADO_LEANDRO_NO_USAR_ESTE_VALOR"
+SESSION_DURATION_DAYS="30"
