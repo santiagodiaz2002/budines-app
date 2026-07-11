@@ -1,7 +1,7 @@
 :root {
   color-scheme: dark;
-  --bg: #181613;
-  --bg-soft: #24211c;
+  --bg: #000;
+  --bg-soft: #171a20;
   --card: #f7f0e5;
   --card-muted: #e9dfd0;
   --ink: #171512;
@@ -30,11 +30,19 @@ body {
   min-height: 100dvh;
   margin: 0;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0) 22rem),
+    linear-gradient(180deg, rgba(32, 111, 214, 0.18), rgba(255, 255, 255, 0) 19rem),
     var(--bg);
   color: #fff8ee;
   font-size: 16px;
   line-height: 1.45;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 0%, rgba(37, 107, 218, 0.14), transparent 34rem);
 }
 
 button,
@@ -60,9 +68,28 @@ select:disabled {
 }
 
 .shell {
+  position: relative;
+  z-index: 1;
   width: min(100%, 520px);
   margin: 0 auto;
   padding: calc(18px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom));
+}
+
+.boot-brand {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  background: #000;
+  animation: boot-brand-out 480ms ease 360ms both;
+  pointer-events: none;
+}
+
+.boot-brand img {
+  width: min(68vw, 280px);
+  height: auto;
+  object-fit: contain;
 }
 
 .topbar {
@@ -71,6 +98,36 @@ select:disabled {
   justify-content: space-between;
   gap: 14px;
   margin-bottom: 18px;
+}
+
+.brand-lockup {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.brand-logo {
+  display: block;
+  height: auto;
+  object-fit: contain;
+  background: #000;
+  flex: 0 0 auto;
+}
+
+.brand-logo--header {
+  width: 74px;
+  aspect-ratio: 1448 / 1086;
+}
+
+.brand-logo--activation {
+  width: min(100%, 210px);
+  margin: 0 auto 16px;
+}
+
+.brand-logo--records {
+  width: 76px;
+  margin-left: auto;
 }
 
 .topbar h1,
@@ -117,6 +174,7 @@ select:disabled {
 
 .auth-panel {
   margin-top: 18px;
+  background: linear-gradient(180deg, #0a0b0f 0, #11131a 34%, var(--card) 34%);
 }
 
 .panel-heading {
@@ -289,6 +347,12 @@ select:disabled {
   gap: 14px;
 }
 
+.records-heading-side {
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+}
+
 .records-state {
   min-height: 1.4em;
   margin: 0;
@@ -438,5 +502,22 @@ select:disabled {
 
   button:active {
     transform: translateY(1px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .boot-brand {
+    display: none;
+  }
+}
+
+@keyframes boot-brand-out {
+  0% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    visibility: hidden;
   }
 }

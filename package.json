@@ -8,7 +8,7 @@
     "dev": "wrangler pages dev public --port 8788",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "node scripts/check-syntax.mjs && node scripts/audit-project.mjs",
+    "lint": "node scripts/check-syntax.mjs && node scripts/audit-project.mjs && node scripts/verify-branding.mjs",
     "check": "npm run lint",
     "validate": "npm run lint && npm run test",
     "db:migrate:local": "wrangler d1 migrations apply budines --local",
@@ -17,6 +17,7 @@
     "deploy": "wrangler pages deploy public --project-name budines"
   },
   "devDependencies": {
+    "sharp": "^0.35.3",
     "vitest": "^3.2.4",
     "wrangler": "^4.24.3"
   }
