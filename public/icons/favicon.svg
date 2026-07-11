@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Budines">
+  <rect width="64" height="64" rx="12" fill="#181613"/>
+  <path d="M14 40c0-14 7-24 18-24s18 10 18 24v4c0 3-3 6-6 6H20c-3 0-6-3-6-6v-4z" fill="#f7f0e5"/>
+  <path d="M18 40c0-11 5-19 14-19s14 8 14 19v3c0 2-2 3-4 3H22c-2 0-4-1-4-3v-3z" fill="#d5a642"/>
+  <path d="M25 34h10c4 0 7 2 7 6s-3 6-7 6H25V34zm5 5v3h5c1 0 2-1 2-2s-1-1-2-1h-5z" fill="#181613"/>
+</svg>

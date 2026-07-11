@@ -1,0 +1,64 @@
+import { requireSession } from '../../_shared/auth.js';
+import { createD1Repository } from '../../_shared/d1-repository.js';
+import {
+  assertDb,
+  jsonResponse,
+  methodNotAllowed,
+  readJsonBody,
+  withApiErrorHandling
+} from '../../_shared/http.js';
+import { createSale } from '../../_shared/records-service.js';
+import { serializeRecord } from '../../_shared/serializers.js';
+import { parsePagination } from '../../_shared/validation.js';
+
+export async function onRequest(context) {
+  if (context.request.method === 'GET') {
+    return handleGet(context);
+  }
+
+  if (context.request.method === 'POST') {
+    return handlePost(context);
+  }
+
+  return methodNotAllowed(['GET', 'POST']);
+}
+
+function handleGet(context) {
+  return withApiErrorHandling(async () => {
+    await requireSession(context);
+    const url = new URL(context.request.url);
+    const { limit, offset } = parsePagination(url.searchParams);
+    const repo = createD1Repository(assertDb(context.env));
+    const records = await repo.listRecords(limit + 1, offset);
+    const visibleRecords = records.slice(0, limit);
+
+    return jsonResponse({
+      ok: true,
+      records: visibleRecords.map(serializeRecord),
+      pagination: {
+        limit,
+        offset,
+        hasMore: records.length > limit,
+        nextOffset: records.length > limit ? offset + limit : null
+      }
+    });
+  });
+}
+
+function handlePost(context) {
+  return withApiErrorHandling(async () => {
+    const session = await requireSession(context);
+    const body = await readJsonBody(context.request);
+    const repo = createD1Repository(assertDb(context.env));
+    const result = await createSale(repo, body, session.user);
+
+    return jsonResponse(
+      {
+        ok: true,
+        result: result.kind,
+        record: serializeRecord(result.record)
+      },
+      { status: result.kind === 'created' ? 201 : 200 }
+    );
+  });
+}

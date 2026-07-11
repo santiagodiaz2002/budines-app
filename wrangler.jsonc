@@ -1,0 +1,13 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "budines",
+  "compatibility_date": "2026-07-11",
+  "pages_build_output_dir": "public",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "budines",
+      "database_id": "PENDIENTE_REEMPLAZAR_CON_DATABASE_ID_REAL_DE_CLOUDFLARE_D1"
+    }
+  ]
+}
