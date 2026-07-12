@@ -1,11 +1,11 @@
 import {
   activateDevice,
   createRecord,
+  deleteRecord,
   getSession,
   getSummary,
   listRecords,
-  logout,
-  voidRecord
+  logout
 } from './api.js';
 import {
   formatArs,
@@ -44,6 +44,7 @@ const dom = {
   loadMoreRecords: document.querySelector('#load-more-records'),
   voidDialog: document.querySelector('#void-dialog'),
   voidCopy: document.querySelector('#void-copy'),
+  voidDetails: document.querySelector('#void-details'),
   voidForm: document.querySelector('#void-form'),
   voidConfirmation: document.querySelector('#void-confirmation'),
   voidError: document.querySelector('#void-error'),
@@ -60,7 +61,9 @@ const state = {
   recordsOffset: 0,
   recordsLimit: 30,
   hasMoreRecords: false,
-  recordPendingVoid: null
+  recordPendingDelete: null,
+  deleteTrigger: null,
+  isDeletingRecord: false
 };
 
 init();
@@ -83,8 +86,11 @@ function bindEvents() {
   dom.loadMoreRecords.addEventListener('click', () => loadRecords({ reset: false }));
   dom.logoutButton.addEventListener('click', handleLogout);
   dom.recordsList.addEventListener('click', handleRecordsClick);
-  dom.voidCancel.addEventListener('click', closeVoidDialog);
-  dom.voidForm.addEventListener('submit', handleVoidSubmit);
+  dom.voidCancel.addEventListener('click', closeDeleteDialog);
+  dom.voidConfirmation.addEventListener('input', updateDeleteButtonState);
+  dom.voidForm.addEventListener('submit', handleDeleteSubmit);
+  dom.voidDialog.addEventListener('click', handleDialogBackdropClick);
+  document.addEventListener('keydown', handleDocumentKeydown);
 }
 
 async function bootSession() {
@@ -204,43 +210,49 @@ async function handleLogout() {
   } finally {
     state.user = null;
     showActivation();
-    announce('Sesión cerrada.');
+    announce('Sesion cerrada.');
     dom.logoutButton.disabled = false;
   }
 }
 
 function handleRecordsClick(event) {
-  const button = event.target.closest('[data-void-record]');
-  if (!button) {
+  const card = event.target.closest('[data-record-card]');
+  if (!card) {
     return;
   }
 
-  const record = button.record;
-  openVoidDialog(record);
+  state.deleteTrigger = card;
+  openDeleteDialog(card.record);
 }
 
-async function handleVoidSubmit(event) {
+async function handleDeleteSubmit(event) {
   event.preventDefault();
-  if (!state.recordPendingVoid) {
+  if (!state.recordPendingDelete || state.isDeletingRecord) {
     return;
   }
 
   dom.voidError.textContent = '';
+  state.isDeletingRecord = true;
   dom.voidSubmit.disabled = true;
+  dom.voidCancel.disabled = true;
 
   try {
-    await voidRecord({
-      id: state.recordPendingVoid.id,
+    await deleteRecord({
+      id: state.recordPendingDelete.id,
       confirmation: dom.voidConfirmation.value
     });
-    closeVoidDialog();
+    state.isDeletingRecord = false;
+    dom.voidCancel.disabled = false;
+    closeDeleteDialog({ restoreFocus: false });
     await refreshAppData();
-    announce('Registro anulado.');
+    announce('Registro eliminado.');
   } catch (error) {
     dom.voidError.textContent = error.message;
     announce(error.message);
   } finally {
-    dom.voidSubmit.disabled = false;
+    state.isDeletingRecord = false;
+    dom.voidCancel.disabled = false;
+    updateDeleteButtonState();
   }
 }
 
@@ -281,7 +293,7 @@ async function loadRecords({ reset }) {
     state.hasMoreRecords = result.pagination.hasMore;
     state.recordsOffset = result.pagination.nextOffset ?? state.recordsOffset + result.records.length;
     dom.loadMoreRecords.hidden = !state.hasMoreRecords;
-    dom.recordsState.textContent = dom.recordsList.children.length === 0 ? 'No hay registros.' : '';
+    dom.recordsState.textContent = dom.recordsList.children.length === 0 ? 'No hay registros activos.' : '';
   } catch (error) {
     dom.recordsState.textContent = error.message;
   }
@@ -289,12 +301,12 @@ async function loadRecords({ reset }) {
 
 function renderSummary(summary) {
   dom.summaryTotal.textContent = formatArs(summary.totalArs);
-  const lines = [summaryLine('Inversión', formatArs(summary.investmentArs))];
+  const lines = [summaryLine('Inversion', formatArs(summary.investmentArs))];
 
   if (!summary.investmentRecovered) {
     lines.push(summaryLine('Falta recuperar', formatArs(summary.missingArs), 'is-missing'));
   } else {
-    lines.push(summaryLine('Inversión recuperada', 'Sí'));
+    lines.push(summaryLine('Inversion recuperada', 'Si'));
     lines.push(summaryLine('Ganancia real', formatArs(summary.profitArs), summary.profitArs > 0 ? 'is-profit' : ''));
   }
 
@@ -330,7 +342,19 @@ function renderRecords(records, { append }) {
 
 function createRecordCard(record) {
   const card = document.createElement('article');
-  card.className = `record-card ${record.status === 'anulado' ? 'is-voided' : ''}`.trim();
+  card.className = 'record-card';
+  card.tabIndex = 0;
+  card.role = 'button';
+  card.dataset.recordCard = record.id;
+  card.setAttribute('aria-label', `Abrir acciones de ${formatArs(record.amountArs)}`);
+  card.record = record;
+  card.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      state.deleteTrigger = card;
+      openDeleteDialog(record);
+    }
+  });
 
   const head = document.createElement('div');
   head.className = 'record-head';
@@ -340,7 +364,7 @@ function createRecordCard(record) {
   amount.textContent = formatArs(record.amountArs);
 
   const pill = document.createElement('span');
-  pill.className = `record-pill ${record.status === 'anulado' ? 'is-voided' : ''}`.trim();
+  pill.className = 'record-pill';
   pill.textContent = formatRecordStatus(record.status);
 
   head.append(amount, pill);
@@ -355,27 +379,6 @@ function createRecordCard(record) {
   );
 
   card.append(head, details);
-
-  if (record.status === 'anulado') {
-    const voidedBy = record.voidedBy?.displayName || 'Sin informar';
-    card.append(detailNote(`Anulado por ${voidedBy}.`));
-  }
-
-  if (record.type === 'venta' && record.status === 'activo') {
-    const actions = document.createElement('div');
-    actions.className = 'record-actions';
-
-    const button = document.createElement('button');
-    button.className = 'quiet-button';
-    button.type = 'button';
-    button.textContent = 'Anular';
-    button.dataset.voidRecord = record.id;
-    button.record = record;
-
-    actions.append(button);
-    card.append(actions);
-  }
-
   return card;
 }
 
@@ -390,27 +393,58 @@ function detailItem(label, value) {
   return wrapper;
 }
 
-function detailNote(value) {
-  const note = document.createElement('p');
-  note.className = 'input-preview';
-  note.textContent = value;
-  return note;
-}
-
-function openVoidDialog(record) {
-  state.recordPendingVoid = record;
-  dom.voidCopy.textContent = `Para anular ${formatArs(record.amountArs)}, escribí ANULAR.`;
+function openDeleteDialog(record) {
+  state.recordPendingDelete = record;
+  dom.voidCopy.textContent = `Vas a eliminar ${formatArs(record.amountArs)}. La fila queda guardada como baja logica y deja de contar en el resumen.`;
+  dom.voidDetails.replaceChildren(
+    detailItem('Importe', formatArs(record.amountArs)),
+    detailItem('Tipo', formatRecordType(record.type)),
+    detailItem('Usuario', record.user?.displayName || 'Saldo inicial'),
+    detailItem('Gramos', record.grams === null ? 'Sin informar' : `${formatInteger(record.grams)} g`),
+    detailItem('Fecha', formatCommercialDate(record.commercialDate)),
+    detailItem('Estado', formatRecordStatus(record.status))
+  );
   dom.voidConfirmation.value = '';
   dom.voidError.textContent = '';
   dom.voidDialog.hidden = false;
+  updateDeleteButtonState();
   dom.voidConfirmation.focus();
 }
 
-function closeVoidDialog() {
-  state.recordPendingVoid = null;
+function closeDeleteDialog({ restoreFocus = true } = {}) {
+  if (state.isDeletingRecord) {
+    return;
+  }
+
+  const trigger = state.deleteTrigger;
+  state.recordPendingDelete = null;
+  state.deleteTrigger = null;
   dom.voidDialog.hidden = true;
+  dom.voidDetails.replaceChildren();
   dom.voidConfirmation.value = '';
   dom.voidError.textContent = '';
+  dom.voidCancel.disabled = false;
+  updateDeleteButtonState();
+
+  if (restoreFocus && trigger?.isConnected) {
+    trigger.focus();
+  }
+}
+
+function updateDeleteButtonState() {
+  dom.voidSubmit.disabled = state.isDeletingRecord || dom.voidConfirmation.value !== 'ELIMINAR';
+}
+
+function handleDialogBackdropClick(event) {
+  if (event.target === dom.voidDialog) {
+    closeDeleteDialog();
+  }
+}
+
+function handleDocumentKeydown(event) {
+  if (event.key === 'Escape' && !dom.voidDialog.hidden) {
+    closeDeleteDialog();
+  }
 }
 
 function switchView(view) {

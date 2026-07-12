@@ -26,6 +26,19 @@ export function serializeRecord(record) {
           id: record.voidedByUserId,
           displayName: record.voidedByDisplayName
         }
-      : null
+      : null,
+    deletedAt: record.deletedAt || record.voidedAt || null,
+    deletedBy: record.deletedByUserId
+      ? {
+          id: record.deletedByUserId,
+          displayName: record.deletedByDisplayName
+        }
+      : record.voidedByUserId
+        ? {
+            id: record.voidedByUserId,
+            displayName: record.voidedByDisplayName
+          }
+        : null,
+    isDeleted: Boolean(record.isDeleted)
   };
 }

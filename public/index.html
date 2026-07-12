@@ -146,8 +146,9 @@
 
     <div id="void-dialog" class="dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="void-title" hidden>
       <div class="dialog-panel">
-        <h2 id="void-title">Anular registro</h2>
+        <h2 id="void-title">Eliminar registro</h2>
         <p id="void-copy" class="dialog-copy"></p>
+        <dl id="void-details" class="dialog-details"></dl>
         <form id="void-form" class="stack" novalidate>
           <label class="field">
             <span>Confirmación</span>
@@ -161,10 +162,11 @@
               required
             >
           </label>
+          <p class="input-preview">Escribí ELIMINAR para confirmar la baja lógica.</p>
           <p id="void-error" class="form-message" role="status"></p>
           <div class="dialog-actions">
             <button id="void-cancel" class="quiet-button" type="button">Cancelar</button>
-            <button id="void-submit" class="danger-button" type="submit">Anular</button>
+            <button id="void-submit" class="danger-button" type="submit">Eliminar registro</button>
           </div>
         </form>
       </div>

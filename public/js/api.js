@@ -51,7 +51,7 @@ export async function createRecord({ grams, amountArs, idempotencyKey }) {
   });
 }
 
-export async function voidRecord({ id, confirmation }) {
+export async function deleteRecord({ id, confirmation }) {
   return apiRequest(`/api/records/${encodeURIComponent(id)}/void`, {
     method: 'POST',
     body: {

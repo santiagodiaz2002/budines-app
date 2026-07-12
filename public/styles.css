@@ -372,11 +372,18 @@ select:disabled {
   border-radius: 8px;
   background: #fffaf2;
   padding: 14px;
+  text-align: left;
+  cursor: pointer;
 }
 
-.record-card.is-voided {
-  border-color: #d8b1ab;
-  background: #fff4f2;
+.record-card:hover,
+.record-card:focus-visible {
+  border-color: #b9a88e;
+}
+
+.record-card:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
 }
 
 .record-head {
@@ -432,11 +439,6 @@ select:disabled {
   font-weight: 750;
 }
 
-.record-actions {
-  display: flex;
-  justify-content: flex-end;
-}
-
 .dialog-backdrop {
   position: fixed;
   inset: 0;
@@ -461,6 +463,34 @@ select:disabled {
   margin: 8px 0 16px;
   color: var(--muted);
   font-weight: 700;
+}
+
+.dialog-details {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 0 0 16px;
+  padding: 12px;
+  border: 1px solid #dfd1bf;
+  border-radius: 8px;
+  background: #fffaf2;
+}
+
+.dialog-details div {
+  min-width: 0;
+}
+
+.dialog-details dt {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.dialog-details dd {
+  margin: 1px 0 0;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-weight: 750;
 }
 
 .dialog-actions {
