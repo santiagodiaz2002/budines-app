@@ -46,13 +46,17 @@ export async function createSale(repo, input, user, date = new Date()) {
   }
 }
 
-export async function voidSale(repo, recordId, user, confirmation, date = new Date()) {
+export async function deleteRecord(repo, recordId, user, confirmation, date = new Date()) {
   if (typeof recordId !== 'string' || recordId.length < 1 || recordId.length > 120) {
-    throw new ApiError(400, 'invalid_record_id', 'El registro solicitado no es válido.');
+    throw new ApiError(400, 'invalid_record_id', 'El registro solicitado no es valido.');
   }
 
-  if (confirmation !== 'ANULAR') {
-    throw new ApiError(400, 'invalid_confirmation', 'Para anular escribí ANULAR.');
+  if (!/^[A-Za-z0-9:_-]+$/.test(recordId)) {
+    throw new ApiError(400, 'invalid_record_id', 'El registro solicitado no es valido.');
+  }
+
+  if (confirmation !== 'ELIMINAR') {
+    throw new ApiError(400, 'invalid_confirmation', 'Para eliminar escribi ELIMINAR.');
   }
 
   const record = await repo.findRecordById(recordId);
@@ -60,16 +64,12 @@ export async function voidSale(repo, recordId, user, confirmation, date = new Da
     throw new ApiError(404, 'record_not_found', 'El registro no existe.');
   }
 
-  if (record.type === 'saldo_inicial') {
-    throw new ApiError(409, 'initial_balance_not_voidable', 'Un saldo inicial no se puede anular.');
+  if (record.status !== 'activo' || record.isDeleted) {
+    return { kind: 'already_deleted', record };
   }
 
-  if (record.status === 'anulado') {
-    return { kind: 'already_voided', record };
-  }
-
-  const updated = await repo.markRecordVoided(recordId, user.id, nowIso(date));
-  return { kind: 'voided', record: updated };
+  const updated = await repo.markRecordDeleted(recordId, user.id, nowIso(date));
+  return { kind: 'deleted', record: updated };
 }
 
 function assertSameSale(record, expected) {
@@ -80,7 +80,7 @@ function assertSameSale(record, expected) {
     record.amountArs === expected.amountArs;
 
   if (!same) {
-    throw new ApiError(409, 'idempotency_conflict', 'La clave de idempotencia ya fue usada para otra operación.');
+    throw new ApiError(409, 'idempotency_conflict', 'La clave de idempotencia ya fue usada para otra operacion.');
   }
 }
 

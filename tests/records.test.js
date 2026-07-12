@@ -1,30 +1,34 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { createSale, voidSale } from '../functions/_shared/records-service.js';
+import { createSale, deleteRecord } from '../functions/_shared/records-service.js';
 import { getSummary } from '../functions/_shared/summary.js';
-import { createMemoryRepo } from './helpers/memory-repo.js';
+import { createMemoryRepo, saleRecord } from './helpers/memory-repo.js';
 
 const user = {
   id: 'santi',
   displayName: 'Santi'
 };
 
-describe('registros e idempotencia', () => {
-  it('incluye activos, excluye anulados e incluye saldos iniciales', async () => {
+describe('registros, idempotencia y eliminacion logica', () => {
+  it('incluye activos, excluye anulados y excluye bajas logicas', async () => {
     const repo = createMemoryRepo({
       records: [
         ...createMemoryRepo().records,
         saleRecord({ id: 'venta-activa', amountArs: 1000, status: 'activo' }),
-        saleRecord({ id: 'venta-anulada', amountArs: 9000, status: 'anulado' })
+        saleRecord({ id: 'venta-anulada', amountArs: 9000, status: 'anulado' }),
+        saleRecord({ id: 'venta-eliminada', amountArs: 7000, deletedAt: '2026-07-12T00:00:00.000Z', isDeleted: true })
       ]
     });
 
     const summary = await getSummary(repo);
-    expect(summary.totalArs).toBe(66000);
-    expect(repo.records.find((record) => record.type === 'saldo_inicial').grams).toBeNull();
+    const listed = await repo.listRecords(20, 0);
+
+    expect(summary.totalArs).toBe(4000);
+    expect(listed.map((record) => record.id)).toEqual(['saldo-inicial-ars-3000', 'venta-activa']);
+    expect(repo.records.find((record) => record.id === 'saldo-inicial-ars-3000').grams).toBeNull();
   });
 
-  it('primera petición inserta, repetición no duplica y nueva clave crea otra venta', async () => {
+  it('primera peticion inserta, repeticion no duplica y nueva clave crea otra venta', async () => {
     const repo = createMemoryRepo();
     const input = {
       grams: '25',
@@ -32,8 +36,8 @@ describe('registros e idempotencia', () => {
       idempotencyKey: 'idem-key-0000001'
     };
 
-    const first = await createSale(repo, input, user, new Date('2026-07-11T15:00:00.000Z'));
-    const repeated = await createSale(repo, input, user, new Date('2026-07-11T15:00:00.000Z'));
+    const first = await createSale(repo, input, user, new Date('2026-07-12T15:00:00.000Z'));
+    const repeated = await createSale(repo, input, user, new Date('2026-07-12T15:00:00.000Z'));
     const second = await createSale(
       repo,
       {
@@ -41,7 +45,7 @@ describe('registros e idempotencia', () => {
         idempotencyKey: 'idem-key-0000002'
       },
       user,
-      new Date('2026-07-11T15:01:00.000Z')
+      new Date('2026-07-12T15:01:00.000Z')
     );
 
     expect(first.kind).toBe('created');
@@ -50,7 +54,7 @@ describe('registros e idempotencia', () => {
     expect(repo.records.filter((record) => record.type === 'venta')).toHaveLength(2);
   });
 
-  it('la misma clave con otra operación produce conflicto', async () => {
+  it('la misma clave con otra operacion produce conflicto', async () => {
     const repo = createMemoryRepo();
     const input = {
       grams: '25',
@@ -95,7 +99,7 @@ describe('registros e idempotencia', () => {
     });
   });
 
-  it('anula ventas activas, impide saldo inicial y repite sin estados contradictorios', async () => {
+  it('usuario autenticado elimina venta activa y la fila sigue existiendo', async () => {
     const repo = createMemoryRepo();
     const created = await createSale(repo, {
       grams: '10',
@@ -103,26 +107,62 @@ describe('registros e idempotencia', () => {
       idempotencyKey: 'idem-key-0000006'
     }, user);
 
-    const beforeVoid = await getSummary(repo);
-    const voided = await voidSale(repo, created.record.id, user, 'ANULAR', new Date('2026-07-11T16:00:00.000Z'));
-    const repeated = await voidSale(repo, created.record.id, user, 'ANULAR', new Date('2026-07-11T16:01:00.000Z'));
-    const afterVoid = await getSummary(repo);
+    const beforeDelete = await getSummary(repo);
+    const deleted = await deleteRecord(repo, created.record.id, user, 'ELIMINAR', new Date('2026-07-12T16:00:00.000Z'));
+    const repeated = await deleteRecord(repo, created.record.id, user, 'ELIMINAR', new Date('2026-07-12T16:01:00.000Z'));
+    const afterDelete = await getSummary(repo);
 
-    expect(beforeVoid.totalArs).toBe(70000);
-    expect(voided.kind).toBe('voided');
-    expect(repeated.kind).toBe('already_voided');
-    expect(afterVoid.totalArs).toBe(65000);
-    expect(repo.records.find((record) => record.id === created.record.id).voidedByUserId).toBe('santi');
-
-    await expect(
-      voidSale(repo, 'saldo-inicial-ars-3000', user, 'ANULAR')
-    ).rejects.toMatchObject({
-      status: 409,
-      code: 'initial_balance_not_voidable'
+    expect(beforeDelete.totalArs).toBe(8000);
+    expect(deleted.kind).toBe('deleted');
+    expect(repeated.kind).toBe('already_deleted');
+    expect(afterDelete.totalArs).toBe(3000);
+    expect(repo.records.find((record) => record.id === created.record.id)).toMatchObject({
+      status: 'anulado',
+      deletedByUserId: 'santi',
+      isDeleted: true
     });
   });
 
-  it('la migración defiende nulos permitidos solo para saldo inicial', () => {
+  it('usuario autenticado elimina saldo inicial activo y el resumen lo excluye', async () => {
+    const repo = createMemoryRepo();
+
+    const deleted = await deleteRecord(repo, 'saldo-inicial-ars-3000', user, 'ELIMINAR', new Date('2026-07-12T17:00:00.000Z'));
+    const repeated = await deleteRecord(repo, 'saldo-inicial-ars-3000', user, 'ELIMINAR', new Date('2026-07-12T17:01:00.000Z'));
+    const summary = await getSummary(repo);
+    const listed = await repo.listRecords(20, 0);
+
+    expect(deleted.kind).toBe('deleted');
+    expect(repeated.kind).toBe('already_deleted');
+    expect(summary.totalArs).toBe(0);
+    expect(summary.missingArs).toBe(120000);
+    expect(listed).toHaveLength(0);
+    expect(repo.records.find((record) => record.id === 'saldo-inicial-ars-3000')).toMatchObject({
+      status: 'activo',
+      deletedByUserId: 'santi',
+      isDeleted: true
+    });
+  });
+
+  it('rechaza identificador invalido, inexistente y confirmacion incorrecta', async () => {
+    const repo = createMemoryRepo();
+
+    await expect(deleteRecord(repo, '../x', user, 'ELIMINAR')).rejects.toMatchObject({
+      status: 400,
+      code: 'invalid_record_id'
+    });
+
+    await expect(deleteRecord(repo, 'registro-inexistente', user, 'ELIMINAR')).rejects.toMatchObject({
+      status: 404,
+      code: 'record_not_found'
+    });
+
+    await expect(deleteRecord(repo, 'saldo-inicial-ars-3000', user, 'ANULAR')).rejects.toMatchObject({
+      status: 400,
+      code: 'invalid_confirmation'
+    });
+  });
+
+  it('la migracion inicial defiende nulos permitidos solo para saldo inicial', () => {
     const sql = readFileSync('migrations/0001_initial.sql', 'utf8');
 
     expect(sql).toContain("type = 'saldo_inicial'");
@@ -134,23 +174,3 @@ describe('registros e idempotencia', () => {
     expect(sql).toContain('UNIQUE');
   });
 });
-
-function saleRecord(overrides = {}) {
-  return {
-    id: 'venta',
-    type: 'venta',
-    userId: 'santi',
-    userDisplayName: 'Santi',
-    grams: 10,
-    amountArs: 1000,
-    status: 'activo',
-    commercialDate: '2026-07-11',
-    createdAt: '2026-07-11T15:00:00.000Z',
-    voidedAt: null,
-    voidedByUserId: null,
-    voidedByDisplayName: null,
-    idempotencyKey: `idem-${crypto.randomUUID()}`,
-    source: 'web',
-    ...overrides
-  };
-}

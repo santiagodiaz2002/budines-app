@@ -17,7 +17,15 @@ export function createD1Repository(db) {
 
     async getActiveTotalArs() {
       const row = await db
-        .prepare("SELECT COALESCE(SUM(amount_ars), 0) AS total_ars FROM records WHERE status = 'activo'")
+        .prepare(
+          `
+            SELECT COALESCE(SUM(r.amount_ars), 0) AS total_ars
+            FROM records r
+            LEFT JOIN record_deletions rd ON rd.record_id = r.id
+            WHERE r.status = 'activo'
+              AND rd.record_id IS NULL
+          `
+        )
         .first();
 
       const value = Number(row?.total_ars || 0);
@@ -73,20 +81,46 @@ export function createD1Repository(db) {
       return this.findRecordById(record.id);
     },
 
-    async markRecordVoided(recordId, userId, voidedAt) {
+    async markRecordDeleted(recordId, userId, deletedAt) {
+      const record = await this.findRecordById(recordId);
+      if (!record) {
+        throw new ApiError(404, 'record_not_found', 'El registro no existe.');
+      }
+
+      if (record.status !== 'activo' || record.deletedAt) {
+        return record;
+      }
+
+      if (record.type === 'venta') {
+        await db
+          .prepare(
+            `
+              UPDATE records
+              SET status = 'anulado',
+                  voided_at = ?,
+                  voided_by_user_id = ?
+              WHERE id = ?
+                AND type = 'venta'
+                AND status = 'activo'
+            `
+          )
+          .bind(deletedAt, userId, recordId)
+          .run();
+      }
+
       await db
         .prepare(
           `
-            UPDATE records
-            SET status = 'anulado',
-                voided_at = ?,
-                voided_by_user_id = ?
-            WHERE id = ?
-              AND type = 'venta'
-              AND status = 'activo'
+            INSERT OR IGNORE INTO record_deletions (
+              record_id,
+              deleted_at,
+              deleted_by_user_id,
+              reason
+            )
+            VALUES (?, ?, ?, 'user_deleted')
           `
         )
-        .bind(voidedAt, userId, recordId)
+        .bind(recordId, deletedAt, userId)
         .run();
 
       const updated = await this.findRecordById(recordId);
@@ -118,6 +152,10 @@ export function createD1Repository(db) {
             FROM records r
             LEFT JOIN users u ON u.id = r.user_id
             LEFT JOIN users vu ON vu.id = r.voided_by_user_id
+            LEFT JOIN record_deletions rd ON rd.record_id = r.id
+            LEFT JOIN users du ON du.id = rd.deleted_by_user_id
+            WHERE r.status = 'activo'
+              AND rd.record_id IS NULL
             ORDER BY
               COALESCE(r.commercial_date, substr(r.created_at, 1, 10)) DESC,
               r.created_at DESC,
@@ -152,10 +190,16 @@ async function recordSelect(db, whereClause, bindings) {
           r.voided_by_user_id,
           vu.display_name AS voided_by_display_name,
           r.idempotency_key,
-          r.source
+          r.source,
+          rd.deleted_at,
+          rd.deleted_by_user_id,
+          du.display_name AS deleted_by_display_name,
+          rd.reason AS deletion_reason
         FROM records r
         LEFT JOIN users u ON u.id = r.user_id
         LEFT JOIN users vu ON vu.id = r.voided_by_user_id
+        LEFT JOIN record_deletions rd ON rd.record_id = r.id
+        LEFT JOIN users du ON du.id = rd.deleted_by_user_id
         WHERE ${whereClause}
         LIMIT 1
       `
@@ -179,6 +223,11 @@ function mapRecord(row) {
     voidedByUserId: row.voided_by_user_id,
     voidedByDisplayName: row.voided_by_display_name,
     idempotencyKey: row.idempotency_key,
-    source: row.source
+    source: row.source,
+    deletedAt: row.deleted_at,
+    deletedByUserId: row.deleted_by_user_id,
+    deletedByDisplayName: row.deleted_by_display_name,
+    deletionReason: row.deletion_reason,
+    isDeleted: Boolean(row.deleted_at || row.status === 'anulado')
   };
 }

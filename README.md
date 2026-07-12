@@ -115,7 +115,7 @@ El binding debe llamarse exactamente `DB`.
 npm run db:migrate:local
 ```
 
-Esto crea tablas, índices, usuarios permitidos, inversión inicial de ARS 120000 y los dos saldos iniciales reales de ARS 3000 y ARS 62000.
+Esto crea tablas, índices, usuarios permitidos, inversión inicial de ARS 120000 y los saldos iniciales históricos. La migración `0002_remove_incorrect_62000_record.sql` da de baja lógica el saldo incorrecto de ARS 62000, por lo que el saldo inicial activo correcto queda en ARS 3000.
 
 ## Aplicación de migraciones remota
 
@@ -207,19 +207,19 @@ En cada iPhone:
 4. Confirmar el nombre `Budines`.
 5. Abrir desde el icono instalado y verificar modo standalone.
 
-## Verificación de los ARS 65000 iniciales
+## Verificación del saldo inicial activo de ARS 3000
 
-Después de aplicar migraciones:
+Después de aplicar todas las migraciones:
 
 ```bash
-npx wrangler d1 execute budines --local --command "SELECT amount_ars, type, grams, user_id, commercial_date, status FROM records ORDER BY id;"
+npx wrangler d1 execute budines --local --command "SELECT r.id, r.amount_ars, r.type, r.grams, r.user_id, r.commercial_date, r.status, rd.deleted_at FROM records r LEFT JOIN record_deletions rd ON rd.record_id = r.id ORDER BY r.id;"
 ```
 
 Resultado esperado:
 
-- Una fila `saldo_inicial` por ARS 3000, activa, sin gramos, sin usuario, sin fecha comercial.
-- Una fila `saldo_inicial` por ARS 62000, activa, sin gramos, sin usuario, sin fecha comercial.
-- Resumen inicial: total ARS 65000, inversión ARS 120000, falta recuperar ARS 55000.
+- La fila `saldo-inicial-ars-3000` sigue activa, sin gramos, sin usuario, sin fecha comercial y sin baja lógica.
+- La fila `saldo-inicial-ars-62000` sigue existiendo, pero aparece en `record_deletions`.
+- Resumen inicial correcto: total ARS 3000, inversión ARS 120000, falta recuperar ARS 117000.
 
 ## Consulta de registros
 
@@ -233,9 +233,9 @@ Sin sesión debe devolver `401`.
 
 ## Anulación de una venta
 
-Desde la app, tocar `Anular` en una venta activa y escribir `ANULAR`. La API conserva la fila, cambia estado a `anulado`, guarda fecha y usuario, y excluye el importe del resumen.
+Desde la app, abrir `Registros`, tocar una tarjeta activa, revisar el panel y escribir `ELIMINAR`. La API conserva la fila, registra una baja lógica, guarda fecha y usuario cuando corresponde, y excluye el importe del resumen.
 
-Los registros `saldo_inicial` no muestran acción de anulación y la API también lo impide.
+La eliminación está disponible para ventas activas y saldos iniciales activos. No existe eliminación física ni restauración en esta versión.
 
 ## Rotación de credenciales
 
@@ -275,7 +275,7 @@ npx wrangler d1 export budines --local --output=budines-local-backup.sql
 - Si `/api/summary` devuelve `401`, activar el dispositivo.
 - Si D1 remoto falla, verificar `database_id`, binding `DB` y migraciones remotas.
 - Si un registro se envió dos veces con la misma clave de idempotencia, la API devuelve la operación existente y no duplica filas.
-- Si se anuló una venta por error, no hay restauración en esta versión; conservar la fila y corregir mediante una migración o herramienta administrativa diseñada aparte.
+- Si se eliminó un registro por error, no hay restauración en esta versión; conservar la fila y corregir mediante una migración o herramienta administrativa diseñada aparte.
 
 ## Elementos no verificados hasta desplegar
 
@@ -297,11 +297,11 @@ npx wrangler d1 export budines --local --output=budines-local-backup.sql
 6. `/api/health` responde en producción.
 7. Activación de Santi funciona.
 8. Activación de Leandro funciona.
-9. Resumen inicial muestra ARS 65000, ARS 120000 y ARS 55000.
+9. Resumen inicial muestra ARS 3000, ARS 120000 y ARS 117000.
 10. Una venta nueva actualiza resumen y registros.
 11. Repetir una petición con la misma clave no duplica.
-12. Anular una venta excluye el importe del resumen.
-13. Los saldos iniciales no se pueden anular.
+12. Eliminar una venta excluye el importe del resumen.
+13. Eliminar un saldo inicial activo excluye el importe del resumen sin borrar la fila.
 14. La app se instala y abre en modo standalone en ambos iPhone.
 
 ## Información todavía no identificada
@@ -309,6 +309,4 @@ npx wrangler d1 export budines --local --output=budines-local-backup.sql
 - Gramos del registro inicial de ARS 3000.
 - Usuario del registro inicial de ARS 3000.
 - Fecha comercial del registro inicial de ARS 3000.
-- Gramos del registro inicial de ARS 62000.
-- Usuario del registro inicial de ARS 62000.
-- Fecha comercial del registro inicial de ARS 62000.
+- El registro histórico de ARS 62000 fue confirmado como incorrecto y queda dado de baja lógica; no se deben inventar gramos, usuario ni fecha comercial para esa fila.
