@@ -47,9 +47,10 @@ if (!migration.includes("amount_ars) = 'integer'") || !migration.includes('grams
 }
 
 const frontendFiles = collectFiles('public/js').filter((file) => file.endsWith('.js'));
+const localStorageAllowed = new Set(['public\\js\\truco.js', 'public\\js\\metronome.js', 'public/js/truco.js', 'public/js/metronome.js']);
 for (const file of frontendFiles) {
   const content = readFileSync(file, 'utf8');
-  if (content.includes('localStorage')) {
+  if (content.includes('localStorage') && !localStorageAllowed.has(file)) {
     failures.push(`${file} usa localStorage`);
   }
   if (content.includes('innerHTML')) {

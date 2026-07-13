@@ -14,6 +14,11 @@ import {
   formatRecordStatus,
   formatRecordType
 } from './format.js';
+import { createAudioCoordinator } from './audio-coordinator.js';
+import { initMetronome } from './metronome.js';
+import { initToolNavigation } from './navigation.js';
+import { initTruco } from './truco.js';
+import { initTuner } from './tuner.js';
 import { parsePositiveIntegerText, validateSaleFields } from './validation.js';
 
 const dom = {
@@ -70,8 +75,17 @@ init();
 
 function init() {
   registerServiceWorker();
+  initLocalTools();
   bindEvents();
   bootSession();
+}
+
+function initLocalTools() {
+  const audioCoordinator = createAudioCoordinator();
+  initToolNavigation();
+  initTruco();
+  initMetronome(document.querySelector('#metronome-tool'), audioCoordinator);
+  initTuner(document.querySelector('#tuner-tool'), audioCoordinator);
 }
 
 function bindEvents() {
