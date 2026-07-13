@@ -1,10 +1,14 @@
 # Budines
 
-Budines es una PWA privada para dos usuarios, Santi y Leandro, destinada a registrar operaciones compartidas desde iPhone. La app usa frontend estático, Cloudflare Pages Functions como backend y Cloudflare D1 como base persistente.
+Budines es una PWA privada para dos usuarios, Santi y Leandro, destinada a registrar operaciones compartidas desde iPhone. La app usa frontend estático, Cloudflare Pages Functions como backend y Cloudflare D1 como base persistente. Además incluye herramientas locales de uso diario: Truco, Metrónomo y Afinador.
 
 ## Arquitectura
 
 - `public/`: HTML, CSS, JavaScript modular, manifest, service worker e iconos.
+- `public/js/navigation.js`: navegación inferior entre las cuatro pestañas.
+- `public/js/truco.js`: anotador local de Truco a 30.
+- `public/js/metronome-core.js` y `public/js/metronome.js`: lógica testeable, UI y audio del metrónomo.
+- `public/js/tuner-core.js` y `public/js/tuner.js`: detección cromática, estabilización y UI del afinador.
 - `functions/api/`: API JSON bajo `/api`.
 - `functions/_shared/`: validación, autenticación, sesiones, repositorio D1, resumen e idempotencia.
 - `migrations/`: migraciones SQL versionadas para D1.
@@ -12,6 +16,55 @@ Budines es una PWA privada para dos usuarios, Santi y Leandro, destinada a regis
 - Binding D1 obligatorio: `DB`.
 
 La sesión se activa con un código privado de entorno y se mantiene con una cookie opaca `HttpOnly`. El token completo solo vive en la cookie; D1 guarda el hash SHA-256.
+
+## Pestañas de la app
+
+La pantalla principal tiene una barra inferior fija con cuatro pestañas:
+
+1. `Budines`: activación, carga de ventas, resumen, registros y baja lógica.
+2. `Truco`: anotador argentino a 30 puntos para `Nosotros` y `Ellos`.
+3. `Metrónomo`: metrónomo 4/4 normal y por bloques.
+4. `Afinador`: afinador cromático para guitarra, bajo y afinaciones alternativas.
+
+Cambiar de pestaña no recarga la página. Budines conserva autenticación, D1, registros, resumen y eliminación lógica. Las otras tres herramientas son locales al dispositivo y no escriben en D1.
+
+## Herramientas locales
+
+### Truco
+
+- Partida exclusivamente a 30 puntos.
+- Equipos iniciales: `Nosotros` y `Ellos`.
+- Botones `+` y `−` con límites 0 y 30.
+- Ganador visible al llegar a 30, con posibilidad de restar después.
+- Deshacer revierte el último cambio.
+- Nueva partida requiere confirmación en modal.
+- Puntajes e historial se guardan en `localStorage`; datos corruptos se descartan.
+- Cada punto se representa con una instancia decorativa de `public/media/joint.jpg`, generada desde el archivo fuente `Joint.jpg` de 630x360 px. Los bloques de cinco usan cuatro imágenes verticales y una diagonal.
+
+### Metrónomo
+
+- Compás fijo 4/4.
+- BPM manual entero entre 30 y 300.
+- Iniciar, Pausar/Reanudar, Stop, Tap Tempo y volumen.
+- El audio se programa con Web Audio API usando anticipación sobre `AudioContext.currentTime`.
+- El primer pulso del compás está acentuado.
+- `Configurar` permite agregar, editar, eliminar y reordenar bloques de `compases + BPM`.
+- La secuencia por bloques cambia BPM en el primer pulso del compás siguiente, vuelve al primer bloque al terminar y se repite hasta Stop.
+- BPM, volumen y secuencia se guardan localmente.
+
+### Afinador
+
+- Afinador cromático con referencia `A4 = 440 Hz`.
+- Detecta nota, octava, frecuencia, frecuencia objetivo y desviación en cents.
+- Usa `getUserMedia`, Web Audio API y detección YIN/autocorrelación normalizada; no depende del pico FFT.
+- Prioriza estabilidad en graves de bajo, ignora señales débiles y modera saltos de octava.
+- El permiso de micrófono se pide solo al pulsar `Iniciar afinador`.
+- Al detener, se cierran nodos y se liberan todos los `MediaStreamTrack`.
+- No graba, no envía y no almacena audio.
+
+### Coordinación de audio
+
+Al iniciar el metrónomo se detiene el afinador. Al iniciar el afinador se detiene el metrónomo. No deben quedar ambas herramientas de audio ejecutándose simultáneamente.
 
 ## Requisitos
 
@@ -155,6 +208,8 @@ Validación completa:
 npm run validate
 ```
 
+Las pruebas cubren regresión de Budines, navegación de las cuatro pestañas, reglas de Truco, representación con Joint, validación y avance del metrónomo, conversión/detección del afinador y liberación de pistas. La calidad acústica final del metrónomo y del afinador debe comprobarse en un dispositivo físico con parlante y micrófono.
+
 ## Despliegue en Cloudflare Pages
 
 Crear el proyecto Pages una sola vez:
@@ -286,6 +341,7 @@ npx wrangler d1 export budines --local --output=budines-local-backup.sql
 - Dominio o URL final de Pages.
 - Safari real en iPhone.
 - Instalación desde `Agregar a pantalla de inicio`.
+- Prueba física del micrófono, parlante, latencia de audio y estabilidad del afinador en un iPhone real.
 
 ## Lista final de comprobaciones de producción
 
@@ -302,7 +358,9 @@ npx wrangler d1 export budines --local --output=budines-local-backup.sql
 11. Repetir una petición con la misma clave no duplica.
 12. Eliminar una venta excluye el importe del resumen.
 13. Eliminar un saldo inicial activo excluye el importe del resumen sin borrar la fila.
-14. La app se instala y abre en modo standalone en ambos iPhone.
+14. La barra inferior muestra Budines, Truco, Metrónomo y Afinador.
+15. `public/media/joint.jpg`, módulos JS nuevos, manifest y service worker responden sin 404.
+16. La app se instala y abre en modo standalone en ambos iPhone.
 
 ## Información todavía no identificada
 

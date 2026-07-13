@@ -1,14 +1,22 @@
-const CACHE_NAME = 'budines-shell-v3';
+const CACHE_NAME = 'budines-shell-v4';
 const SHELL_ASSETS = [
   '/',
   '/index.html',
   '/styles.css',
+  '/js/audio-coordinator.js',
   '/js/api.js',
   '/js/app.js',
   '/js/format.js',
+  '/js/metronome-core.js',
+  '/js/metronome.js',
+  '/js/navigation.js',
+  '/js/truco.js',
+  '/js/tuner-core.js',
+  '/js/tuner.js',
   '/js/validation.js',
   '/manifest.webmanifest',
   '/branding/logo-luz-en-ruinas.png',
+  '/media/joint.jpg',
   '/icons/favicon-16.png',
   '/icons/favicon-32.png',
   '/icons/icon-192.png',

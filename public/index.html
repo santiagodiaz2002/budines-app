@@ -11,6 +11,7 @@
     <meta name="color-scheme" content="dark light">
     <title>Budines</title>
     <link rel="preload" href="/branding/logo-luz-en-ruinas.png" as="image">
+    <link rel="preload" href="/media/joint.jpg" as="image">
     <link rel="manifest" href="/manifest.webmanifest">
     <link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
     <link rel="icon" href="/icons/favicon-16.png" sizes="16x16" type="image/png">
@@ -33,116 +34,276 @@
         <p id="session-badge" class="session-badge" hidden></p>
       </header>
 
-      <main>
-        <section id="activation-view" class="panel auth-panel">
-          <img class="brand-logo brand-logo--activation" src="/branding/logo-luz-en-ruinas.png" alt="Luz en Ruinas" width="1448" height="1086">
-          <div class="panel-heading">
-            <p class="eyebrow">Activación</p>
-            <h2>Ingresá al dispositivo</h2>
-          </div>
-
-          <form id="activation-form" class="stack" novalidate>
-            <label class="field">
-              <span>Usuario</span>
-              <select id="activation-user" name="userName" autocomplete="username" required>
-                <option value="Santi">Santi</option>
-                <option value="Leandro">Leandro</option>
-              </select>
-            </label>
-
-            <label class="field">
-              <span>Código de activación</span>
-              <input
-                id="activation-code"
-                name="activationCode"
-                type="password"
-                autocomplete="one-time-code"
-                autocapitalize="none"
-                spellcheck="false"
-                required
-              >
-            </label>
-
-            <p id="activation-error" class="form-message" role="status"></p>
-            <button id="activation-submit" class="primary-button" type="submit">Activar</button>
-          </form>
-        </section>
-
-        <section id="app-view" hidden>
-          <section id="summary-card" class="summary-card" aria-live="polite">
-            <p class="eyebrow">Total acumulado</p>
-            <p id="summary-total" class="summary-total">$ 0</p>
-            <div id="summary-lines" class="summary-lines"></div>
-          </section>
-
-          <nav class="view-switcher" aria-label="Secciones">
-            <button id="show-entry" class="switch-button is-active" type="button">Carga</button>
-            <button id="show-records" class="switch-button" type="button">Registros</button>
-          </nav>
-
-          <section id="entry-section" class="panel">
-            <div class="panel-heading row-heading">
-              <div>
-                <p class="eyebrow">Nueva operación</p>
-                <h2>Registrar venta</h2>
-              </div>
-              <button id="logout-button" class="quiet-button" type="button">Salir</button>
+      <main id="main-content">
+        <section id="budines-tool" class="tool-panel" data-tool-panel="budines" role="tabpanel" aria-labelledby="tab-budines">
+          <section id="activation-view" class="panel auth-panel">
+            <img class="brand-logo brand-logo--activation" src="/branding/logo-luz-en-ruinas.png" alt="Luz en Ruinas" width="1448" height="1086">
+            <div class="panel-heading">
+              <p class="eyebrow">Activación</p>
+              <h2>Ingresá al dispositivo</h2>
             </div>
 
-            <form id="sale-form" class="stack" novalidate>
+            <form id="activation-form" class="stack" novalidate>
               <label class="field">
-                <span>Gramos</span>
+                <span>Usuario</span>
+                <select id="activation-user" name="userName" autocomplete="username" required>
+                  <option value="Santi">Santi</option>
+                  <option value="Leandro">Leandro</option>
+                </select>
+              </label>
+
+              <label class="field">
+                <span>Código de activación</span>
                 <input
-                  id="grams-input"
-                  name="grams"
-                  type="text"
-                  inputmode="numeric"
-                  pattern="[0-9]*"
-                  maxlength="12"
-                  autocomplete="off"
+                  id="activation-code"
+                  name="activationCode"
+                  type="password"
+                  autocomplete="one-time-code"
+                  autocapitalize="none"
+                  spellcheck="false"
                   required
                 >
               </label>
 
-              <label class="field">
-                <span>Importe total</span>
-                <input
-                  id="amount-input"
-                  name="amountArs"
-                  type="text"
-                  inputmode="numeric"
-                  pattern="[0-9]*"
-                  maxlength="12"
-                  autocomplete="off"
-                  required
-                >
-              </label>
-
-              <p id="amount-preview" class="input-preview" aria-live="polite"></p>
-              <p id="sale-error" class="form-message" role="status"></p>
-              <button id="sale-submit" class="primary-button" type="submit">Registrar</button>
+              <p id="activation-error" class="form-message" role="status"></p>
+              <button id="activation-submit" class="primary-button" type="submit">Activar</button>
             </form>
           </section>
 
-          <section id="records-section" class="panel records-panel" hidden>
+          <section id="app-view" hidden>
+            <section id="summary-card" class="summary-card" aria-live="polite">
+              <p class="eyebrow">Total acumulado</p>
+              <p id="summary-total" class="summary-total">$ 0</p>
+              <div id="summary-lines" class="summary-lines"></div>
+            </section>
+
+            <nav class="view-switcher" aria-label="Secciones">
+              <button id="show-entry" class="switch-button is-active" type="button">Carga</button>
+              <button id="show-records" class="switch-button" type="button">Registros</button>
+            </nav>
+
+            <section id="entry-section" class="panel">
+              <div class="panel-heading row-heading">
+                <div>
+                  <p class="eyebrow">Nueva operación</p>
+                  <h2>Registrar venta</h2>
+                </div>
+                <button id="logout-button" class="quiet-button" type="button">Salir</button>
+              </div>
+
+              <form id="sale-form" class="stack" novalidate>
+                <label class="field">
+                  <span>Gramos</span>
+                  <input
+                    id="grams-input"
+                    name="grams"
+                    type="text"
+                    inputmode="numeric"
+                    pattern="[0-9]*"
+                    maxlength="12"
+                    autocomplete="off"
+                    required
+                  >
+                </label>
+
+                <label class="field">
+                  <span>Importe total</span>
+                  <input
+                    id="amount-input"
+                    name="amountArs"
+                    type="text"
+                    inputmode="numeric"
+                    pattern="[0-9]*"
+                    maxlength="12"
+                    autocomplete="off"
+                    required
+                  >
+                </label>
+
+                <p id="amount-preview" class="input-preview" aria-live="polite"></p>
+                <p id="sale-error" class="form-message" role="status"></p>
+                <button id="sale-submit" class="primary-button" type="submit">Registrar</button>
+              </form>
+            </section>
+
+            <section id="records-section" class="panel records-panel" hidden>
+              <div class="panel-heading row-heading">
+                <div>
+                  <p class="eyebrow">Historial</p>
+                  <h2>Registros</h2>
+                </div>
+                <div class="records-heading-side">
+                  <img class="brand-logo brand-logo--records" src="/branding/logo-luz-en-ruinas.png" alt="Luz en Ruinas" width="1448" height="1086">
+                  <button id="reload-records" class="quiet-button" type="button">Recargar</button>
+                </div>
+              </div>
+
+              <p id="records-state" class="records-state" role="status"></p>
+              <div id="records-list" class="records-list"></div>
+              <button id="load-more-records" class="secondary-button" type="button" hidden>Ver más</button>
+            </section>
+          </section>
+        </section>
+
+        <section id="truco-tool" class="tool-panel" data-tool-panel="truco" role="tabpanel" aria-labelledby="tab-truco" hidden>
+          <section class="panel tool-card">
             <div class="panel-heading row-heading">
               <div>
-                <p class="eyebrow">Historial</p>
-                <h2>Registros</h2>
+                <p class="eyebrow">Truco argentino</p>
+                <h2>Anotador a 30</h2>
               </div>
-              <div class="records-heading-side">
-                <img class="brand-logo brand-logo--records" src="/branding/logo-luz-en-ruinas.png" alt="Luz en Ruinas" width="1448" height="1086">
-                <button id="reload-records" class="quiet-button" type="button">Recargar</button>
-              </div>
+              <button id="truco-reset" class="quiet-button" type="button">Nueva partida</button>
             </div>
 
-            <p id="records-state" class="records-state" role="status"></p>
-            <div id="records-list" class="records-list"></div>
-            <button id="load-more-records" class="secondary-button" type="button" hidden>Ver más</button>
+            <p id="truco-winner" class="tool-status" role="status">Partida a 30 puntos</p>
+            <div class="truco-board">
+              <article class="team-card" data-truco-team="nosotros">
+                <div class="team-heading">
+                  <h3>Nosotros</h3>
+                  <p><span data-truco-score>0</span><span class="sr-only"> puntos</span></p>
+                </div>
+                <div class="score-actions" aria-label="Puntaje de Nosotros">
+                  <button class="score-button" type="button" data-truco-action="subtract" data-truco-team-target="nosotros" data-truco-minus aria-label="Restar punto a Nosotros">−</button>
+                  <button class="score-button" type="button" data-truco-action="add" data-truco-team-target="nosotros" data-truco-plus aria-label="Sumar punto a Nosotros">+</button>
+                </div>
+                <div class="stick-grid" data-truco-sticks aria-label="Nosotros 0 puntos"></div>
+              </article>
+
+              <article class="team-card" data-truco-team="ellos">
+                <div class="team-heading">
+                  <h3>Ellos</h3>
+                  <p><span data-truco-score>0</span><span class="sr-only"> puntos</span></p>
+                </div>
+                <div class="score-actions" aria-label="Puntaje de Ellos">
+                  <button class="score-button" type="button" data-truco-action="subtract" data-truco-team-target="ellos" data-truco-minus aria-label="Restar punto a Ellos">−</button>
+                  <button class="score-button" type="button" data-truco-action="add" data-truco-team-target="ellos" data-truco-plus aria-label="Sumar punto a Ellos">+</button>
+                </div>
+                <div class="stick-grid" data-truco-sticks aria-label="Ellos 0 puntos"></div>
+              </article>
+            </div>
+
+            <button id="truco-undo" class="secondary-button" type="button">Deshacer</button>
+          </section>
+        </section>
+
+        <section id="metronome-tool" class="tool-panel" data-tool-panel="metronome" role="tabpanel" aria-labelledby="tab-metronome" hidden>
+          <section class="panel tool-card">
+            <div class="panel-heading row-heading">
+              <div>
+                <p class="eyebrow">Metrónomo</p>
+                <h2>4/4 por bloques</h2>
+              </div>
+              <button id="metronome-configure" class="quiet-button" type="button">Configurar</button>
+            </div>
+
+            <div class="metronome-display" aria-live="polite">
+              <div id="metronome-indicator" class="pulse-indicator" aria-hidden="true"></div>
+              <dl class="metrics-grid">
+                <div>
+                  <dt>Pulso</dt>
+                  <dd id="metronome-pulse">1/4</dd>
+                </div>
+                <div>
+                  <dt>Compás</dt>
+                  <dd id="metronome-measure">1/4</dd>
+                </div>
+                <div>
+                  <dt>Bloque</dt>
+                  <dd id="metronome-block">1/1</dd>
+                </div>
+                <div>
+                  <dt>BPM actual</dt>
+                  <dd id="metronome-bpm-now">100</dd>
+                </div>
+              </dl>
+            </div>
+
+            <div class="tool-controls">
+              <label class="field">
+                <span>BPM</span>
+                <input id="metronome-bpm" type="text" inputmode="numeric" autocomplete="off" value="100">
+              </label>
+              <label class="field">
+                <span>Volumen</span>
+                <input id="metronome-volume" type="range" min="0" max="1" step="0.01" value="0.65">
+              </label>
+            </div>
+
+            <div class="button-grid">
+              <button id="metronome-start" class="primary-button" type="button">Iniciar</button>
+              <button id="metronome-pause" class="secondary-button" type="button">Pausar</button>
+              <button id="metronome-stop" class="quiet-button" type="button">Stop</button>
+              <button id="metronome-tap" class="quiet-button" type="button">Tap Tempo</button>
+            </div>
+            <p id="metronome-status" class="tool-status" role="status"></p>
+          </section>
+        </section>
+
+        <section id="tuner-tool" class="tool-panel" data-tool-panel="tuner" role="tabpanel" aria-labelledby="tab-tuner" hidden>
+          <section class="panel tool-card">
+            <div class="panel-heading">
+              <p class="eyebrow">Afinador cromático</p>
+              <h2>Guitarra, bajo y alternativas</h2>
+            </div>
+
+            <div class="tuner-display" aria-live="polite">
+              <p id="tuner-reference" class="input-preview"></p>
+              <div class="tuner-note">
+                <span id="tuner-note">A</span>
+                <small id="tuner-octave">4</small>
+              </div>
+              <p id="tuner-verdict" class="tuner-verdict">Detenido</p>
+              <div class="tuner-meter" aria-hidden="true">
+                <span>Grave</span>
+                <div class="meter-track">
+                  <div id="tuner-needle" class="meter-needle"></div>
+                </div>
+                <span>Agudo</span>
+              </div>
+              <dl class="metrics-grid">
+                <div>
+                  <dt>Detectada</dt>
+                  <dd id="tuner-frequency">-- Hz</dd>
+                </div>
+                <div>
+                  <dt>Objetivo</dt>
+                  <dd id="tuner-target">440.0 Hz</dd>
+                </div>
+                <div>
+                  <dt>Desvío</dt>
+                  <dd id="tuner-cents">-- cents</dd>
+                </div>
+              </dl>
+            </div>
+
+            <div class="button-grid two">
+              <button id="tuner-start" class="primary-button" type="button">Iniciar afinador</button>
+              <button id="tuner-stop" class="quiet-button" type="button" disabled>Detener afinador</button>
+            </div>
+            <p id="tuner-status" class="tool-status" role="status"></p>
           </section>
         </section>
       </main>
     </div>
+
+    <nav id="bottom-tabs" class="bottom-tabs" role="tablist" aria-label="Herramientas">
+      <button id="tab-budines" class="bottom-tab is-active" type="button" role="tab" aria-selected="true" aria-controls="budines-tool" data-tool-tab="budines">
+        <svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6.5h14M5 12h14M5 17.5h9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <span>Budines</span>
+      </button>
+      <button id="tab-truco" class="bottom-tab" type="button" role="tab" aria-selected="false" aria-controls="truco-tool" data-tool-tab="truco">
+        <svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10v16H7zM10 8h4M10 12h4M10 16h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>Truco</span>
+      </button>
+      <button id="tab-metronome" class="bottom-tab" type="button" role="tab" aria-selected="false" aria-controls="metronome-tool" data-tool-tab="metronome">
+        <svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v4M12 12l4-4M5 19h14M7 19l3-11h4l3 11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>Metrónomo</span>
+      </button>
+      <button id="tab-tuner" class="bottom-tab" type="button" role="tab" aria-selected="false" aria-controls="tuner-tool" data-tool-tab="tuner">
+        <svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h3l2-5 4 10 2-5h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>Afinador</span>
+      </button>
+    </nav>
 
     <div id="void-dialog" class="dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="void-title" hidden>
       <div class="dialog-panel">
@@ -169,6 +330,32 @@
             <button id="void-submit" class="danger-button" type="submit">Eliminar registro</button>
           </div>
         </form>
+      </div>
+    </div>
+
+    <div id="truco-reset-dialog" class="dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="truco-reset-title" hidden>
+      <div class="dialog-panel">
+        <h2 id="truco-reset-title">Nueva partida</h2>
+        <p class="dialog-copy">Se reinician los puntos de Nosotros y Ellos. El historial local se borra.</p>
+        <div class="dialog-actions">
+          <button id="truco-reset-cancel" class="quiet-button" type="button">Cancelar</button>
+          <button id="truco-reset-confirm" class="danger-button" type="button">Nueva partida</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="metronome-config-dialog" class="dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="metronome-config-title" hidden>
+      <div class="dialog-panel dialog-panel--wide">
+        <h2 id="metronome-config-title">Configurar bloques</h2>
+        <p class="dialog-copy">Cada bloque define cuántos compases toca y a qué BPM. La secuencia se repite hasta Stop.</p>
+        <div id="metronome-block-list" class="metronome-block-list"></div>
+        <p id="metronome-config-error" class="form-message" role="status"></p>
+        <div class="dialog-actions dialog-actions--stack">
+          <button id="metronome-add-block" class="quiet-button" type="button">Agregar bloque</button>
+          <button id="metronome-restore-blocks" class="quiet-button" type="button">Restaurar predeterminada</button>
+          <button id="metronome-cancel-blocks" class="secondary-button" type="button">Cancelar</button>
+          <button id="metronome-save-blocks" class="primary-button" type="button">Guardar</button>
+        </div>
       </div>
     </div>
 
