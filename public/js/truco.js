@@ -6,7 +6,9 @@ const DEFAULT_TEAMS = {
 };
 const MAX_SCORE = 30;
 const MIN_SCORE = 0;
-const JOINT_SRC = '/media/joint.jpg';
+const JOINT_SRC = '/media/joint-clean.png';
+const JOINT_WIDTH = 489;
+const JOINT_HEIGHT = 90;
 
 export function createDefaultTrucoState() {
   return {
@@ -236,6 +238,8 @@ function createStickNodes(score) {
       img.className = 'stick-img stick-img--vertical';
       img.dataset.stick = 'vertical';
       img.src = JOINT_SRC;
+      img.width = JOINT_WIDTH;
+      img.height = JOINT_HEIGHT;
       img.alt = '';
       img.decoding = 'async';
       img.loading = 'lazy';
@@ -248,6 +252,8 @@ function createStickNodes(score) {
       img.className = 'stick-img stick-img--diagonal';
       img.dataset.stick = 'diagonal';
       img.src = JOINT_SRC;
+      img.width = JOINT_WIDTH;
+      img.height = JOINT_HEIGHT;
       img.alt = '';
       img.decoding = 'async';
       img.loading = 'lazy';

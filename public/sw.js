@@ -1,4 +1,4 @@
-const CACHE_NAME = 'budines-shell-v4';
+const CACHE_NAME = 'budines-shell-v5';
 const SHELL_ASSETS = [
   '/',
   '/index.html',
@@ -16,6 +16,7 @@ const SHELL_ASSETS = [
   '/js/validation.js',
   '/manifest.webmanifest',
   '/branding/logo-luz-en-ruinas.png',
+  '/media/joint-clean.png',
   '/media/joint.jpg',
   '/icons/favicon-16.png',
   '/icons/favicon-32.png',

@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { Window } from 'happy-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import sharp from 'sharp';
 import {
   applyScoreChange,
   createDefaultTrucoState,
@@ -57,6 +58,25 @@ describe('Truco a 30', () => {
     expect(stored.scores.nosotros).toBe(1);
   });
 
+  it('renderiza los palitos con el asset limpio y decorativo', () => {
+    setupDom();
+    initTruco();
+
+    for (let index = 0; index < 5; index += 1) {
+      document.querySelector('[data-truco-team-target="nosotros"][data-truco-action="add"]').click();
+    }
+
+    const block = document.querySelector('[data-truco-team="nosotros"] [data-stick-block="1"]');
+    const vertical = block.querySelectorAll('[data-stick="vertical"]');
+    const diagonal = block.querySelectorAll('[data-stick="diagonal"]');
+    const images = block.querySelectorAll('img');
+
+    expect(vertical).toHaveLength(4);
+    expect(diagonal).toHaveLength(1);
+    expect([...images].every((image) => image.getAttribute('src') === '/media/joint-clean.png')).toBe(true);
+    expect([...images].every((image) => image.getAttribute('alt') === '')).toBe(true);
+  });
+
   it('cancela y confirma nueva partida con modal', () => {
     setupDom();
     initTruco();
@@ -103,6 +123,15 @@ describe('Truco a 30', () => {
 
     expect(state.scores).toEqual({ nosotros: 4, ellos: 7 });
     expect(state.history).toEqual([]);
+  });
+
+  it('el asset derivado del joint conserva transparencia', async () => {
+    const metadata = await sharp('public/media/joint-clean.png').metadata();
+
+    expect(metadata.format).toBe('png');
+    expect(metadata.hasAlpha).toBe(true);
+    expect(metadata.width).toBeGreaterThan(450);
+    expect(metadata.height).toBeGreaterThan(80);
   });
 });
 

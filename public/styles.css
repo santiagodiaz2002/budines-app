@@ -401,6 +401,14 @@ select:disabled {
   gap: 16px;
 }
 
+#truco-tool .tool-card {
+  gap: 18px;
+  border-color: rgba(213, 166, 66, 0.26);
+  background:
+    linear-gradient(180deg, rgba(255, 250, 242, 0.98), rgba(238, 225, 205, 0.96)),
+    var(--card);
+}
+
 .tool-status {
   min-height: 1.45em;
   margin: 0;
@@ -457,22 +465,25 @@ select:disabled {
 
 .truco-board {
   display: grid;
-  gap: 12px;
+  gap: 16px;
 }
 
 .team-card {
   display: grid;
-  gap: 12px;
+  gap: 16px;
   min-width: 0;
-  padding: 14px;
-  border: 1px solid #dfd1bf;
+  padding: 18px;
+  border: 1px solid rgba(130, 102, 63, 0.24);
   border-radius: 8px;
-  background: #fffaf2;
+  background:
+    linear-gradient(180deg, rgba(255, 252, 246, 0.96), rgba(247, 237, 222, 0.96)),
+    #fffaf2;
+  box-shadow: 0 12px 28px rgba(41, 32, 20, 0.12);
 }
 
 .team-heading {
   display: flex;
-  align-items: end;
+  align-items: center;
   justify-content: space-between;
   gap: 10px;
 }
@@ -483,42 +494,62 @@ select:disabled {
 }
 
 .team-heading h3 {
-  font-size: 1rem;
+  font-size: 1.02rem;
 }
 
 .team-heading p {
+  min-width: 72px;
+  margin-left: auto;
+  border: 1px solid rgba(130, 102, 63, 0.18);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.48);
   color: var(--ink);
-  font-size: 2.25rem;
+  font-size: 2.6rem;
   font-weight: 900;
   line-height: 1;
+  text-align: center;
+  padding: 8px 10px 10px;
 }
 
 .score-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  gap: 10px;
 }
 
 .score-button {
   border: 1px solid #cdbfa8;
-  background: #fff;
+  background: #fffaf2;
   color: var(--ink);
-  font-size: 1.3rem;
+  font-size: 1.55rem;
+  min-height: 54px;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .stick-grid {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 8px;
-  min-height: 66px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, 88px);
+  justify-content: center;
+  gap: 14px 12px;
+  min-height: 126px;
+  padding: 16px 10px;
+  border: 1px solid rgba(130, 102, 63, 0.16);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(43, 35, 25, 0.05), rgba(255, 255, 255, 0.34)),
+    #f4eadb;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .stick-block {
   position: relative;
-  flex: 0 0 54px;
-  width: 54px;
-  height: 66px;
+  width: 88px;
+  height: 118px;
+  border-radius: 8px;
 }
 
 .stick-img {
@@ -526,22 +557,35 @@ select:disabled {
   display: block;
   object-fit: contain;
   transform-origin: center;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
+  filter: drop-shadow(0 4px 4px rgba(33, 25, 15, 0.22));
 }
 
 .stick-img--vertical {
-  top: 16px;
-  left: calc(2px + var(--stick-index) * 12px);
-  width: 44px;
-  height: 12px;
+  top: 46px;
+  left: calc(-34px + var(--stick-index) * 18px);
+  width: 98px;
+  height: 26px;
   transform: rotate(-90deg);
 }
 
 .stick-img--diagonal {
-  top: 22px;
-  left: 3px;
-  width: 48px;
-  height: 14px;
+  top: 47px;
+  left: -8px;
+  width: 104px;
+  height: 28px;
   transform: rotate(-31deg);
+}
+
+#truco-tool button,
+#truco-reset-dialog button {
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .metronome-display,
