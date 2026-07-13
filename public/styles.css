@@ -505,9 +505,10 @@ body[data-active-tool="truco"] #truco-tool {
   --truco-pad: clamp(5px, 1.8vw, 10px);
   --stick-slot-w: clamp(26px, 8vw, 42px);
   --stick-slot-h: clamp(39px, 10.8vw, 68px);
-  --stick-w: clamp(37px, 11.4vw, 64px);
-  --stick-h: clamp(10px, 2.7vw, 16px);
-  --stick-spread: clamp(5px, 1.4vw, 8px);
+  --stick-long: clamp(31px, 9.7vw, 54px);
+  --stick-thick: clamp(8px, 2.5vw, 14px);
+  --stick-x-offset: clamp(8px, 2.5vw, 14px);
+  --stick-y-offset: clamp(8px, 2.4vw, 13px);
   min-height: 0;
   color: #fff4da;
 }
@@ -732,6 +733,8 @@ body[data-active-tool="truco"] #truco-tool {
 .stick-img {
   position: absolute;
   display: block;
+  width: var(--stick-long);
+  height: var(--stick-thick);
   object-fit: contain;
   transform-origin: center;
   pointer-events: none;
@@ -741,20 +744,36 @@ body[data-active-tool="truco"] #truco-tool {
   filter: drop-shadow(0 4px 4px rgba(33, 25, 15, 0.22));
 }
 
-.stick-img--vertical {
-  top: calc(50% - var(--stick-h) / 2);
-  left: calc((100% - var(--stick-w)) / 2 + (var(--stick-index) - 1.5) * var(--stick-spread));
-  width: var(--stick-w);
-  height: var(--stick-h);
-  transform: rotate(-90deg);
+.stick-img--left {
+  top: 50%;
+  left: calc(50% - var(--stick-x-offset));
+  transform: translate(-50%, -50%) rotate(-90deg);
+}
+
+.stick-img--top {
+  top: calc(50% - var(--stick-y-offset));
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.stick-img--right {
+  top: 50%;
+  left: calc(50% + var(--stick-x-offset));
+  transform: translate(-50%, -50%) rotate(-90deg);
+}
+
+.stick-img--bottom {
+  top: calc(50% + var(--stick-y-offset));
+  left: 50%;
+  transform: translate(-50%, -50%);
 }
 
 .stick-img--diagonal {
-  top: calc(50% - var(--stick-h) / 2);
-  left: calc((100% - var(--stick-w)) / 2);
-  width: calc(var(--stick-w) * 1.08);
-  height: calc(var(--stick-h) * 1.08);
-  transform: rotate(-31deg);
+  top: 50%;
+  left: 50%;
+  width: calc(var(--stick-long) * 1.14);
+  height: calc(var(--stick-thick) * 1.08);
+  transform: translate(-50%, -50%) rotate(-35deg);
 }
 
 #truco-tool button,

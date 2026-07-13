@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { Window } from 'happy-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import sharp from 'sharp';
@@ -68,12 +68,14 @@ describe('Truco a 30', () => {
     }
 
     const block = document.querySelector('[data-truco-team="nosotros"] [data-truco-group="0"]');
-    const vertical = block.querySelectorAll('[data-stick="vertical"]');
+    const base = block.querySelectorAll('[data-stick="base"]');
     const diagonal = block.querySelectorAll('[data-stick="diagonal"]');
     const images = block.querySelectorAll('img');
+    const positions = [...base].map((image) => image.dataset.stickPosition);
 
-    expect(vertical).toHaveLength(4);
+    expect(base).toHaveLength(4);
     expect(diagonal).toHaveLength(1);
+    expect(positions).toEqual(['left', 'top', 'right', 'bottom']);
     expect([...images].every((image) => image.getAttribute('src') === '/media/joint-clean.png')).toBe(true);
     expect([...images].every((image) => image.getAttribute('alt') === '')).toBe(true);
   });
@@ -100,6 +102,98 @@ describe('Truco a 30', () => {
     expect(columns[0].querySelector('[data-truco-action="subtract"]')).not.toBeNull();
     expect(columns[4].querySelector('[data-truco-action="add"]')).not.toBeNull();
     expect(columns[4].querySelector('[data-truco-action="subtract"]')).not.toBeNull();
+  });
+
+  it('mantiene el puntaje total numerico fuera del marcador visual', () => {
+    setupDom();
+    initTruco();
+
+    addPoints('nosotros', 8);
+
+    expect(document.querySelector('[data-truco-team="nosotros"] [data-truco-score]').textContent).toBe('8');
+    const visualGroups = [...document.querySelectorAll('[data-truco-team="nosotros"] [data-truco-group]')];
+    expect(visualGroups.every((group) => group.textContent.trim() === '')).toBe(true);
+    expect(visualGroups.flatMap((group) => [...group.children]).every((child) => child.tagName === 'IMG')).toBe(true);
+  });
+
+  it.each([
+    [0, [0, 0, 0, 0, 0, 0]],
+    [3, [3, 0, 0, 0, 0, 0]],
+    [5, [5, 0, 0, 0, 0, 0]],
+    [8, [5, 3, 0, 0, 0, 0]],
+    [15, [5, 5, 5, 0, 0, 0]],
+    [16, [5, 5, 5, 1, 0, 0]],
+    [30, [5, 5, 5, 5, 5, 5]]
+  ])('renderiza %i puntos con imagenes reales del joint', (score, expectedGroups) => {
+    setupDom();
+    initTruco();
+
+    addPoints('nosotros', score);
+
+    expect(imageCount('nosotros')).toBe(score);
+    expect(groupImageCounts('nosotros')).toEqual(expectedGroups);
+    expect(allJointImages('nosotros').every((image) => image.getAttribute('src') === '/media/joint-clean.png')).toBe(true);
+  });
+
+  it('cada grupo completo tiene cuatro joints base y uno diagonal', () => {
+    setupDom();
+    initTruco();
+
+    addPoints('nosotros', 15);
+
+    for (const group of [...document.querySelectorAll('[data-truco-team="nosotros"] [data-truco-group]')].slice(0, 3)) {
+      expect(group.querySelectorAll('[data-stick="base"]')).toHaveLength(4);
+      expect(group.querySelectorAll('[data-stick="diagonal"]')).toHaveLength(1);
+      expect([...group.querySelectorAll('[data-stick="base"]')].map((image) => image.dataset.stickPosition)).toEqual([
+        'left',
+        'top',
+        'right',
+        'bottom'
+      ]);
+    }
+  });
+
+  it('restar y deshacer actualizan las imagenes del joint', () => {
+    setupDom();
+    initTruco();
+
+    addPoints('nosotros', 3);
+    expect(imageCount('nosotros')).toBe(3);
+
+    document.querySelector('[data-truco-team-target="nosotros"][data-truco-action="subtract"]').click();
+    expect(imageCount('nosotros')).toBe(2);
+
+    document.querySelector('[data-truco-team-target="nosotros"][data-truco-action="add"]').click();
+    expect(imageCount('nosotros')).toBe(3);
+
+    document.querySelector('#truco-undo').click();
+    expect(imageCount('nosotros')).toBe(2);
+  });
+
+  it('Nosotros y Ellos mantienen imagenes independientes', () => {
+    setupDom();
+    initTruco();
+
+    addPoints('nosotros', 3);
+    addPoints('ellos', 5);
+
+    expect(imageCount('nosotros')).toBe(3);
+    expect(imageCount('ellos')).toBe(5);
+    expect(groupImageCounts('nosotros')).toEqual([3, 0, 0, 0, 0, 0]);
+    expect(groupImageCounts('ellos')).toEqual([5, 0, 0, 0, 0, 0]);
+  });
+
+  it('conserva separacion visual despues de los primeros 15', () => {
+    setupDom();
+    initTruco();
+
+    const field = document.querySelector('[data-truco-team="nosotros"]');
+    const sections = [...field.querySelectorAll('.fifteen-section')];
+
+    expect(sections).toHaveLength(2);
+    expect(field.querySelector('.fifteen-divider')).not.toBeNull();
+    expect(sections[0].querySelectorAll('[data-truco-group]')).toHaveLength(3);
+    expect(sections[1].querySelectorAll('[data-truco-group]')).toHaveLength(3);
   });
 
   it('cancela y confirma nueva partida con modal', () => {
@@ -167,12 +261,42 @@ describe('Truco a 30', () => {
   it('el asset derivado del joint conserva transparencia', async () => {
     const metadata = await sharp('public/media/joint-clean.png').metadata();
 
+    expect(existsSync('public/media/joint-clean.png')).toBe(true);
     expect(metadata.format).toBe('png');
     expect(metadata.hasAlpha).toBe(true);
     expect(metadata.width).toBeGreaterThan(450);
     expect(metadata.height).toBeGreaterThan(80);
+
+    const { data, info } = await sharp('public/media/joint-clean.png').ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    const alphaAt = (x, y) => data[(y * info.width + x) * 4 + 3];
+    expect([
+      alphaAt(0, 0),
+      alphaAt(info.width - 1, 0),
+      alphaAt(0, info.height - 1),
+      alphaAt(info.width - 1, info.height - 1)
+    ].every((alpha) => alpha === 0)).toBe(true);
   });
 });
+
+function addPoints(team, count) {
+  for (let index = 0; index < count; index += 1) {
+    document.querySelector(`[data-truco-team-target="${team}"][data-truco-action="add"]`).click();
+  }
+}
+
+function allJointImages(team) {
+  return [...document.querySelectorAll(`[data-truco-team="${team}"] [data-truco-group] img`)];
+}
+
+function imageCount(team) {
+  return allJointImages(team).length;
+}
+
+function groupImageCounts(team) {
+  return [...document.querySelectorAll(`[data-truco-team="${team}"] [data-truco-group]`)].map(
+    (group) => group.querySelectorAll('img').length
+  );
+}
 
 function setupDom() {
   const html = readFileSync('public/index.html', 'utf8');
