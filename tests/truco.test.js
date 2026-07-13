@@ -59,7 +59,7 @@ describe('Truco a 30', () => {
     expect(stored.scores.nosotros).toBe(1);
   });
 
-  it('renderiza los palitos con el asset limpio y decorativo', () => {
+  it('renderiza los palitos con el smoke limpio y decorativo', () => {
     setupDom();
     initTruco();
 
@@ -76,7 +76,7 @@ describe('Truco a 30', () => {
     expect(base).toHaveLength(4);
     expect(diagonal).toHaveLength(1);
     expect(positions).toEqual(['left', 'top', 'right', 'bottom']);
-    expect([...images].every((image) => image.getAttribute('src') === '/media/joint-clean.png')).toBe(true);
+    expect([...images].every((image) => image.getAttribute('src') === '/media/smoke.png')).toBe(true);
     expect([...images].every((image) => image.getAttribute('alt') === '')).toBe(true);
   });
 
@@ -124,7 +124,7 @@ describe('Truco a 30', () => {
     [15, [5, 5, 5, 0, 0, 0]],
     [16, [5, 5, 5, 1, 0, 0]],
     [30, [5, 5, 5, 5, 5, 5]]
-  ])('renderiza %i puntos con imagenes reales del joint', (score, expectedGroups) => {
+  ])('renderiza %i puntos con imagenes reales de smoke', (score, expectedGroups) => {
     setupDom();
     initTruco();
 
@@ -132,10 +132,10 @@ describe('Truco a 30', () => {
 
     expect(imageCount('nosotros')).toBe(score);
     expect(groupImageCounts('nosotros')).toEqual(expectedGroups);
-    expect(allJointImages('nosotros').every((image) => image.getAttribute('src') === '/media/joint-clean.png')).toBe(true);
+    expect(allTallyImages('nosotros').every((image) => image.getAttribute('src') === '/media/smoke.png')).toBe(true);
   });
 
-  it('cada grupo completo tiene cuatro joints base y uno diagonal', () => {
+  it('cada grupo completo tiene cuatro smokes base y uno diagonal', () => {
     setupDom();
     initTruco();
 
@@ -153,7 +153,7 @@ describe('Truco a 30', () => {
     }
   });
 
-  it('restar y deshacer actualizan las imagenes del joint', () => {
+  it('restar y deshacer actualizan las imagenes de smoke', () => {
     setupDom();
     initTruco();
 
@@ -258,16 +258,16 @@ describe('Truco a 30', () => {
     expect(state.history).toEqual([]);
   });
 
-  it('el asset derivado del joint conserva transparencia', async () => {
-    const metadata = await sharp('public/media/joint-clean.png').metadata();
+  it('el asset derivado de smoke conserva transparencia', async () => {
+    const metadata = await sharp('public/media/smoke.png').metadata();
 
-    expect(existsSync('public/media/joint-clean.png')).toBe(true);
+    expect(existsSync('public/media/smoke.png')).toBe(true);
     expect(metadata.format).toBe('png');
     expect(metadata.hasAlpha).toBe(true);
     expect(metadata.width).toBeGreaterThan(450);
-    expect(metadata.height).toBeGreaterThan(80);
+    expect(metadata.height).toBeGreaterThan(50);
 
-    const { data, info } = await sharp('public/media/joint-clean.png').ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    const { data, info } = await sharp('public/media/smoke.png').ensureAlpha().raw().toBuffer({ resolveWithObject: true });
     const alphaAt = (x, y) => data[(y * info.width + x) * 4 + 3];
     expect([
       alphaAt(0, 0),
@@ -284,12 +284,12 @@ function addPoints(team, count) {
   }
 }
 
-function allJointImages(team) {
+function allTallyImages(team) {
   return [...document.querySelectorAll(`[data-truco-team="${team}"] [data-truco-group] img`)];
 }
 
 function imageCount(team) {
-  return allJointImages(team).length;
+  return allTallyImages(team).length;
 }
 
 function groupImageCounts(team) {

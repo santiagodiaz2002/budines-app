@@ -6,9 +6,9 @@ const DEFAULT_TEAMS = {
 };
 const MAX_SCORE = 30;
 const MIN_SCORE = 0;
-const JOINT_SRC = '/media/joint-clean.png';
-const JOINT_WIDTH = 489;
-const JOINT_HEIGHT = 90;
+const TALLY_SRC = '/media/smoke.png';
+const TALLY_WIDTH = 489;
+const TALLY_HEIGHT = 62;
 const BASE_STICK_POSITIONS = ['left', 'top', 'right', 'bottom'];
 
 export function createDefaultTrucoState() {
@@ -253,9 +253,9 @@ function createStickNodes(group) {
     img.className = `stick-img stick-img--base stick-img--${position}`;
     img.dataset.stick = 'base';
     img.dataset.stickPosition = position;
-    img.src = JOINT_SRC;
-    img.width = JOINT_WIDTH;
-    img.height = JOINT_HEIGHT;
+    img.src = TALLY_SRC;
+    img.width = TALLY_WIDTH;
+    img.height = TALLY_HEIGHT;
     img.alt = '';
     img.decoding = 'async';
     img.loading = 'lazy';
@@ -266,9 +266,9 @@ function createStickNodes(group) {
     const img = document.createElement('img');
     img.className = 'stick-img stick-img--diagonal';
     img.dataset.stick = 'diagonal';
-    img.src = JOINT_SRC;
-    img.width = JOINT_WIDTH;
-    img.height = JOINT_HEIGHT;
+    img.src = TALLY_SRC;
+    img.width = TALLY_WIDTH;
+    img.height = TALLY_HEIGHT;
     img.alt = '';
     img.decoding = 'async';
     img.loading = 'lazy';
