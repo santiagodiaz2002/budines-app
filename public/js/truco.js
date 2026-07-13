@@ -9,6 +9,7 @@ const MIN_SCORE = 0;
 const JOINT_SRC = '/media/joint-clean.png';
 const JOINT_WIDTH = 489;
 const JOINT_HEIGHT = 90;
+const BASE_STICK_POSITIONS = ['left', 'top', 'right', 'bottom'];
 
 export function createDefaultTrucoState() {
   return {
@@ -247,16 +248,17 @@ function createStickNodes(group) {
   const nodes = [];
 
   for (let index = 0; index < group.vertical; index += 1) {
+    const position = BASE_STICK_POSITIONS[index];
     const img = document.createElement('img');
-    img.className = 'stick-img stick-img--vertical';
-    img.dataset.stick = 'vertical';
+    img.className = `stick-img stick-img--base stick-img--${position}`;
+    img.dataset.stick = 'base';
+    img.dataset.stickPosition = position;
     img.src = JOINT_SRC;
     img.width = JOINT_WIDTH;
     img.height = JOINT_HEIGHT;
     img.alt = '';
     img.decoding = 'async';
     img.loading = 'lazy';
-    img.style.setProperty('--stick-index', String(index));
     nodes.push(img);
   }
 

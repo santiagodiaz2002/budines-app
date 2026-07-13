@@ -1,4 +1,4 @@
-const CACHE_NAME = 'budines-shell-v6';
+const CACHE_NAME = 'budines-shell-v7';
 const SHELL_ASSETS = [
   '/',
   '/index.html',
