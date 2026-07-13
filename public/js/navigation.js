@@ -15,7 +15,7 @@ export function initToolNavigation({
   let currentTab = TOOL_TABS.includes(initialTab) ? initialTab : 'budines';
 
   nav.addEventListener('click', (event) => {
-    const button = event.target.closest('[data-tool-tab]');
+    const button = findTabButton(event);
     if (!button) {
       return;
     }
@@ -64,4 +64,15 @@ export function initToolNavigation({
     },
     buttons
   };
+}
+
+function findTabButton(event) {
+  const target = event.target;
+  if (target?.closest) {
+    return target.closest('[data-tool-tab]');
+  }
+
+  return event
+    .composedPath?.()
+    .find((node) => node?.dataset?.toolTab);
 }

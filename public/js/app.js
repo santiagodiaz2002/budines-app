@@ -527,7 +527,8 @@ function announce(message) {
 }
 
 function registerServiceWorker() {
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  const serviceWorker = globalThis.navigator?.serviceWorker || globalThis.window?.navigator?.serviceWorker;
+  if (serviceWorker) {
+    serviceWorker.register('/sw.js').catch(() => {});
   }
 }

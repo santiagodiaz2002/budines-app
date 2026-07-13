@@ -37,6 +37,16 @@ describe('navegacion inferior de herramientas', () => {
     expect(document.querySelector('#tab-tuner').getAttribute('aria-selected')).toBe('true');
     expect(document.querySelector('#tab-budines').getAttribute('aria-selected')).toBe('false');
   });
+
+  it('acepta clicks sobre el icono interno de la pestaña', () => {
+    setupDom();
+    initToolNavigation();
+
+    document.querySelector('#tab-truco svg path').dispatchEvent(new windowRef.MouseEvent('click', { bubbles: true }));
+
+    expect(document.querySelector('#truco-tool').hidden).toBe(false);
+    expect(document.querySelector('#tab-truco').getAttribute('aria-selected')).toBe('true');
+  });
 });
 
 function setupDom() {
