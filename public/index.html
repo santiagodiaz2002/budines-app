@@ -146,43 +146,80 @@
         </section>
 
         <section id="truco-tool" class="tool-panel" data-tool-panel="truco" role="tabpanel" aria-labelledby="tab-truco" hidden>
-          <section class="panel tool-card">
-            <div class="panel-heading row-heading">
+          <section class="truco-shell" aria-labelledby="truco-title">
+            <header class="truco-header">
               <div>
-                <p class="eyebrow">Truco argentino</p>
-                <h2>Anotador a 30</h2>
+                <p class="eyebrow">Marcador</p>
+                <h2 id="truco-title">Truco</h2>
               </div>
-              <button id="truco-reset" class="quiet-button" type="button">Nueva partida</button>
-            </div>
+              <div class="truco-actions">
+                <button id="truco-undo" class="quiet-button" type="button">Deshacer</button>
+                <button id="truco-reset" class="quiet-button" type="button">Nueva partida</button>
+              </div>
+            </header>
 
-            <p id="truco-winner" class="tool-status" role="status">Partida a 30 puntos</p>
-            <div class="truco-board">
-              <article class="team-card" data-truco-team="nosotros">
-                <div class="team-heading">
+            <p id="truco-winner" class="tool-status truco-status" role="status">Partida a 30 puntos</p>
+            <div class="truco-board" data-truco-board>
+              <div class="score-rail score-rail--left" aria-label="Puntaje de Nosotros">
+                <button class="score-button" type="button" data-truco-action="add" data-truco-team-target="nosotros" data-truco-plus aria-label="Sumar punto a Nosotros">+</button>
+                <button class="score-button" type="button" data-truco-action="subtract" data-truco-team-target="nosotros" data-truco-minus aria-label="Restar punto a Nosotros">&minus;</button>
+              </div>
+
+              <article class="team-field team-field--nosotros" data-truco-team="nosotros">
+                <header class="team-field-head">
                   <h3>Nosotros</h3>
                   <p><span data-truco-score>0</span><span class="sr-only"> puntos</span></p>
-                </div>
-                <div class="score-actions" aria-label="Puntaje de Nosotros">
-                  <button class="score-button" type="button" data-truco-action="subtract" data-truco-team-target="nosotros" data-truco-minus aria-label="Restar punto a Nosotros">−</button>
-                  <button class="score-button" type="button" data-truco-action="add" data-truco-team-target="nosotros" data-truco-plus aria-label="Sumar punto a Nosotros">+</button>
-                </div>
-                <div class="stick-grid" data-truco-sticks aria-label="Nosotros 0 puntos"></div>
+                </header>
+                <section class="fifteen-section" aria-label="Nosotros malas">
+                  <p class="fifteen-label">Malas</p>
+                  <div class="stick-groups" aria-label="Nosotros puntos 1 a 15">
+                    <div class="stick-block" data-truco-group="0"></div>
+                    <div class="stick-block" data-truco-group="1"></div>
+                    <div class="stick-block" data-truco-group="2"></div>
+                  </div>
+                </section>
+                <div class="fifteen-divider" aria-hidden="true"></div>
+                <section class="fifteen-section" aria-label="Nosotros buenas">
+                  <p class="fifteen-label">Buenas</p>
+                  <div class="stick-groups" aria-label="Nosotros puntos 16 a 30">
+                    <div class="stick-block" data-truco-group="3"></div>
+                    <div class="stick-block" data-truco-group="4"></div>
+                    <div class="stick-block" data-truco-group="5"></div>
+                  </div>
+                </section>
               </article>
 
-              <article class="team-card" data-truco-team="ellos">
-                <div class="team-heading">
+              <div class="truco-center-line" aria-hidden="true"></div>
+
+              <article class="team-field team-field--ellos" data-truco-team="ellos">
+                <header class="team-field-head">
                   <h3>Ellos</h3>
                   <p><span data-truco-score>0</span><span class="sr-only"> puntos</span></p>
-                </div>
-                <div class="score-actions" aria-label="Puntaje de Ellos">
-                  <button class="score-button" type="button" data-truco-action="subtract" data-truco-team-target="ellos" data-truco-minus aria-label="Restar punto a Ellos">−</button>
-                  <button class="score-button" type="button" data-truco-action="add" data-truco-team-target="ellos" data-truco-plus aria-label="Sumar punto a Ellos">+</button>
-                </div>
-                <div class="stick-grid" data-truco-sticks aria-label="Ellos 0 puntos"></div>
+                </header>
+                <section class="fifteen-section" aria-label="Ellos malas">
+                  <p class="fifteen-label">Malas</p>
+                  <div class="stick-groups" aria-label="Ellos puntos 1 a 15">
+                    <div class="stick-block" data-truco-group="0"></div>
+                    <div class="stick-block" data-truco-group="1"></div>
+                    <div class="stick-block" data-truco-group="2"></div>
+                  </div>
+                </section>
+                <div class="fifteen-divider" aria-hidden="true"></div>
+                <section class="fifteen-section" aria-label="Ellos buenas">
+                  <p class="fifteen-label">Buenas</p>
+                  <div class="stick-groups" aria-label="Ellos puntos 16 a 30">
+                    <div class="stick-block" data-truco-group="3"></div>
+                    <div class="stick-block" data-truco-group="4"></div>
+                    <div class="stick-block" data-truco-group="5"></div>
+                  </div>
+                </section>
               </article>
-            </div>
 
-            <button id="truco-undo" class="secondary-button" type="button">Deshacer</button>
+              <div class="score-rail score-rail--right" aria-label="Puntaje de Ellos">
+                <button class="score-button" type="button" data-truco-action="add" data-truco-team-target="ellos" data-truco-plus aria-label="Sumar punto a Ellos">+</button>
+                <button class="score-button" type="button" data-truco-action="subtract" data-truco-team-target="ellos" data-truco-minus aria-label="Restar punto a Ellos">&minus;</button>
+              </div>
+            </div>
           </section>
         </section>
 

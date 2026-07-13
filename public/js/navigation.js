@@ -52,6 +52,7 @@ export function initToolNavigation({
       panel.hidden = name !== currentTab;
     }
 
+    document.body.dataset.activeTool = currentTab;
     onChange(currentTab);
   }
 

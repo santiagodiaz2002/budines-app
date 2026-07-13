@@ -21,6 +21,7 @@ describe('navegacion inferior de herramientas', () => {
     expect(tabs.map((tab) => tab.dataset.toolTab)).toEqual(TOOL_TABS);
     expect(tabs.map((tab) => tab.textContent.trim())).toEqual(['Budines', 'Truco', 'Metrónomo', 'Afinador']);
     expect(nav.currentTab).toBe('budines');
+    expect(document.body.dataset.activeTool).toBe('budines');
     expect(document.querySelector('#budines-tool').hidden).toBe(false);
     expect(document.querySelector('#truco-tool').hidden).toBe(true);
     expect(document.querySelector('#tab-budines').getAttribute('aria-selected')).toBe('true');
@@ -34,6 +35,7 @@ describe('navegacion inferior de herramientas', () => {
 
     expect(document.querySelector('#budines-tool').hidden).toBe(true);
     expect(document.querySelector('#tuner-tool').hidden).toBe(false);
+    expect(document.body.dataset.activeTool).toBe('tuner');
     expect(document.querySelector('#tab-tuner').getAttribute('aria-selected')).toBe('true');
     expect(document.querySelector('#tab-budines').getAttribute('aria-selected')).toBe('false');
   });

@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import sharp from 'sharp';
 import {
   applyScoreChange,
+  createBoardGroups,
   createDefaultTrucoState,
   createStickPattern,
   getTrucoWinner,
@@ -66,7 +67,7 @@ describe('Truco a 30', () => {
       document.querySelector('[data-truco-team-target="nosotros"][data-truco-action="add"]').click();
     }
 
-    const block = document.querySelector('[data-truco-team="nosotros"] [data-stick-block="1"]');
+    const block = document.querySelector('[data-truco-team="nosotros"] [data-truco-group="0"]');
     const vertical = block.querySelectorAll('[data-stick="vertical"]');
     const diagonal = block.querySelectorAll('[data-stick="diagonal"]');
     const images = block.querySelectorAll('img');
@@ -75,6 +76,30 @@ describe('Truco a 30', () => {
     expect(diagonal).toHaveLength(1);
     expect([...images].every((image) => image.getAttribute('src') === '/media/joint-clean.png')).toBe(true);
     expect([...images].every((image) => image.getAttribute('alt') === '')).toBe(true);
+  });
+
+  it('mantiene controles externos y seis grupos por equipo', () => {
+    setupDom();
+    initTruco();
+
+    const board = document.querySelector('[data-truco-board]');
+    const columns = [...board.children];
+    expect(columns[0].classList.contains('score-rail--left')).toBe(true);
+    expect(columns[2].classList.contains('truco-center-line')).toBe(true);
+    expect(columns[4].classList.contains('score-rail--right')).toBe(true);
+
+    for (const team of ['nosotros', 'ellos']) {
+      const field = document.querySelector(`[data-truco-team="${team}"]`);
+      expect(field.querySelectorAll('[data-truco-group]')).toHaveLength(6);
+      expect(field.querySelectorAll('.fifteen-section')).toHaveLength(2);
+      expect(field.querySelectorAll('.fifteen-section')[0].querySelectorAll('[data-truco-group]')).toHaveLength(3);
+      expect(field.querySelectorAll('.fifteen-section')[1].querySelectorAll('[data-truco-group]')).toHaveLength(3);
+    }
+
+    expect(columns[0].querySelector('[data-truco-action="add"]')).not.toBeNull();
+    expect(columns[0].querySelector('[data-truco-action="subtract"]')).not.toBeNull();
+    expect(columns[4].querySelector('[data-truco-action="add"]')).not.toBeNull();
+    expect(columns[4].querySelector('[data-truco-action="subtract"]')).not.toBeNull();
   });
 
   it('cancela y confirma nueva partida con modal', () => {
@@ -113,6 +138,20 @@ describe('Truco a 30', () => {
     ]
   ])('representa %i puntos con bloques de cinco correctos', (score, expected) => {
     expect(createStickPattern(score)).toEqual(expected);
+  });
+
+  it.each([
+    [0, [0, 0, 0, 0, 0, 0]],
+    [1, [1, 0, 0, 0, 0, 0]],
+    [4, [4, 0, 0, 0, 0, 0]],
+    [5, [5, 0, 0, 0, 0, 0]],
+    [8, [5, 3, 0, 0, 0, 0]],
+    [15, [5, 5, 5, 0, 0, 0]],
+    [16, [5, 5, 5, 1, 0, 0]],
+    [30, [5, 5, 5, 5, 5, 5]]
+  ])('ubica %i puntos en los seis grupos fijos', (score, expected) => {
+    const actual = createBoardGroups(score).map((group) => group.vertical + (group.diagonal ? 1 : 0));
+    expect(actual).toEqual(expected);
   });
 
   it('sanitiza historial invalido sin perder puntajes validos', () => {

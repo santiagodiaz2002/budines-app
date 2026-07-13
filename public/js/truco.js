@@ -111,20 +111,18 @@ export function getTrucoWinner(scores) {
 }
 
 export function createStickPattern(score) {
-  const safeScore = clampScore(score);
-  const groups = [];
-  let remaining = safeScore;
+  return createBoardGroups(score).filter((group) => group.vertical > 0 || group.diagonal);
+}
 
-  while (remaining > 0) {
-    const count = Math.min(5, remaining);
-    groups.push({
+export function createBoardGroups(score) {
+  const safeScore = clampScore(score);
+  return Array.from({ length: 6 }, (_, groupIndex) => {
+    const count = Math.min(5, Math.max(0, safeScore - groupIndex * 5));
+    return {
       vertical: Math.min(4, count),
       diagonal: count === 5
-    });
-    remaining -= count;
-  }
-
-  return groups;
+    };
+  });
 }
 
 export function initTruco(root = document.querySelector('#truco-tool')) {
@@ -134,6 +132,15 @@ export function initTruco(root = document.querySelector('#truco-tool')) {
 
   const dom = {
     teams: new Map(TEAM_IDS.map((team) => [team, root.querySelector(`[data-truco-team="${team}"]`)])),
+    controls: new Map(
+      TEAM_IDS.map((team) => [
+        team,
+        {
+          minus: root.querySelector(`[data-truco-team-target="${team}"][data-truco-minus]`),
+          plus: root.querySelector(`[data-truco-team-target="${team}"][data-truco-plus]`)
+        }
+      ])
+    ),
     winner: root.querySelector('#truco-winner'),
     undo: root.querySelector('#truco-undo'),
     reset: root.querySelector('#truco-reset'),
@@ -202,11 +209,20 @@ export function initTruco(root = document.querySelector('#truco-tool')) {
 
       const score = state.scores[team];
       teamRoot.querySelector('[data-truco-score]').textContent = String(score);
-      teamRoot.querySelector('[data-truco-minus]').disabled = score <= MIN_SCORE;
-      teamRoot.querySelector('[data-truco-plus]').disabled = score >= MAX_SCORE;
-      const sticks = teamRoot.querySelector('[data-truco-sticks]');
-      sticks.replaceChildren(...createStickNodes(score));
-      sticks.setAttribute('aria-label', `${DEFAULT_TEAMS[team]} ${score} puntos`);
+      const controls = dom.controls.get(team);
+      controls.minus.disabled = score <= MIN_SCORE;
+      controls.plus.disabled = score >= MAX_SCORE;
+
+      const groups = createBoardGroups(score);
+      for (const groupRoot of teamRoot.querySelectorAll('[data-truco-group]')) {
+        const groupIndex = Number(groupRoot.dataset.trucoGroup);
+        const group = groups[groupIndex] || { vertical: 0, diagonal: false };
+        groupRoot.replaceChildren(...createStickNodes(group));
+        groupRoot.setAttribute(
+          'aria-label',
+          `${DEFAULT_TEAMS[team]} puntos ${groupIndex * 5 + 1} a ${groupIndex * 5 + 5}: ${groupPoints(group)}`
+        );
+      }
     }
 
     const winner = getTrucoWinner(state.scores);
@@ -227,41 +243,41 @@ export function initTruco(root = document.querySelector('#truco-tool')) {
   };
 }
 
-function createStickNodes(score) {
-  return createStickPattern(score).map((group, groupIndex) => {
-    const block = document.createElement('div');
-    block.className = 'stick-block';
-    block.dataset.stickBlock = String(groupIndex + 1);
+function createStickNodes(group) {
+  const nodes = [];
 
-    for (let index = 0; index < group.vertical; index += 1) {
-      const img = document.createElement('img');
-      img.className = 'stick-img stick-img--vertical';
-      img.dataset.stick = 'vertical';
-      img.src = JOINT_SRC;
-      img.width = JOINT_WIDTH;
-      img.height = JOINT_HEIGHT;
-      img.alt = '';
-      img.decoding = 'async';
-      img.loading = 'lazy';
-      img.style.setProperty('--stick-index', String(index));
-      block.append(img);
-    }
+  for (let index = 0; index < group.vertical; index += 1) {
+    const img = document.createElement('img');
+    img.className = 'stick-img stick-img--vertical';
+    img.dataset.stick = 'vertical';
+    img.src = JOINT_SRC;
+    img.width = JOINT_WIDTH;
+    img.height = JOINT_HEIGHT;
+    img.alt = '';
+    img.decoding = 'async';
+    img.loading = 'lazy';
+    img.style.setProperty('--stick-index', String(index));
+    nodes.push(img);
+  }
 
-    if (group.diagonal) {
-      const img = document.createElement('img');
-      img.className = 'stick-img stick-img--diagonal';
-      img.dataset.stick = 'diagonal';
-      img.src = JOINT_SRC;
-      img.width = JOINT_WIDTH;
-      img.height = JOINT_HEIGHT;
-      img.alt = '';
-      img.decoding = 'async';
-      img.loading = 'lazy';
-      block.append(img);
-    }
+  if (group.diagonal) {
+    const img = document.createElement('img');
+    img.className = 'stick-img stick-img--diagonal';
+    img.dataset.stick = 'diagonal';
+    img.src = JOINT_SRC;
+    img.width = JOINT_WIDTH;
+    img.height = JOINT_HEIGHT;
+    img.alt = '';
+    img.decoding = 'async';
+    img.loading = 'lazy';
+    nodes.push(img);
+  }
 
-    return block;
-  });
+  return nodes;
+}
+
+function groupPoints(group) {
+  return group.vertical + (group.diagonal ? 1 : 0);
 }
 
 function readState() {
