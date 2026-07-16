@@ -16,7 +16,7 @@
     <link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
     <link rel="icon" href="/icons/favicon-16.png" sizes="16x16" type="image/png">
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
-    <link rel="stylesheet" href="/styles.css">
+    <link rel="stylesheet" href="/styles.css?v=metronome-fix-20260716c">
   </head>
   <body>
     <div class="boot-brand" aria-hidden="true">
@@ -428,15 +428,39 @@
 
     <div id="metronome-config-dialog" class="dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="metronome-config-title" hidden>
       <div class="dialog-panel dialog-panel--wide">
-        <h2 id="metronome-config-title">Configurar bloques</h2>
-        <p class="dialog-copy">Cada bloque tiene nombre, compases y BPM. Antes de cada parte se anuncia el nombre y una cuenta previa.</p>
+        <h2 id="metronome-config-title">Configurar canción</h2>
+        <p class="dialog-copy">Editá el nombre de la canción y sus partes. Antes de cada parte puede sonar el anuncio y la cuenta previa.</p>
+        <label class="field">
+          <span>Nombre de la canción</span>
+          <input id="metronome-song-name" type="text" maxlength="80" autocomplete="off">
+        </label>
+        <div class="metronome-config-head">
+          <p id="metronome-part-count" class="input-preview">0 de 32 partes</p>
+          <button id="metronome-add-block" class="quiet-button" type="button">Agregar parte</button>
+        </div>
         <div id="metronome-block-list" class="metronome-block-list"></div>
+        <section class="metronome-voice-settings" aria-labelledby="metronome-voice-title">
+          <h3 id="metronome-voice-title">Anuncios</h3>
+          <label class="check-field">
+            <input id="metronome-announce-parts" type="checkbox" checked>
+            <span>Anunciar partes</span>
+          </label>
+          <label class="field">
+            <span>Voz</span>
+            <select id="metronome-voice-select"></select>
+          </label>
+          <label class="field">
+            <span>Volumen de voz</span>
+            <input id="metronome-voice-volume" type="range" min="0" max="1" step="0.01" value="1">
+          </label>
+          <button id="metronome-test-voice" class="quiet-button" type="button">Probar voz</button>
+        </section>
         <p id="metronome-config-error" class="form-message" role="status"></p>
         <div class="dialog-actions dialog-actions--stack">
-          <button id="metronome-add-block" class="quiet-button" type="button">Agregar bloque</button>
-          <button id="metronome-restore-blocks" class="quiet-button" type="button">Restaurar predeterminada</button>
-          <button id="metronome-cancel-blocks" class="secondary-button" type="button">Cancelar</button>
-          <button id="metronome-save-blocks" class="primary-button" type="button">Guardar</button>
+          <button id="metronome-restore-blocks" class="quiet-button" type="button">Restaurar básica</button>
+          <button id="metronome-save-blocks-as" class="secondary-button" type="button">Guardar como nueva</button>
+          <button id="metronome-cancel-blocks" class="quiet-button" type="button">Cancelar cambios</button>
+          <button id="metronome-save-blocks" class="primary-button" type="button">Guardar canción</button>
         </div>
       </div>
     </div>
@@ -471,6 +495,6 @@
     </div>
 
     <p id="live-region" class="sr-only" aria-live="polite" aria-atomic="true"></p>
-    <script type="module" src="/js/app.js"></script>
+    <script type="module" src="/js/app.js?v=metronome-fix-20260716c"></script>
   </body>
 </html>

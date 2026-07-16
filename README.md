@@ -7,7 +7,7 @@ Budines es una PWA privada para dos usuarios, Santi y Leandro, destinada a regis
 - `public/`: HTML, CSS, JavaScript modular, manifest, service worker e iconos.
 - `public/js/navigation.js`: navegación inferior entre las cuatro pestañas.
 - `public/js/truco.js`: anotador local de Truco a 30.
-- `public/js/metronome-core.js` y `public/js/metronome.js`: lógica testeable, UI y audio del metrónomo.
+- `public/js/metronome-core-v2.js`, `public/js/metronome-editor.js`, `public/js/metronome-core.js` y `public/js/metronome.js`: modelo testeable, editor, biblioteca, voz y audio del metrónomo.
 - `public/js/tuner-core.js` y `public/js/tuner.js`: detección cromática, estabilización y UI del afinador.
 - `functions/api/`: API JSON bajo `/api`.
 - `functions/_shared/`: validación, autenticación, sesiones, repositorio D1, resumen e idempotencia.
@@ -23,7 +23,7 @@ La pantalla principal tiene una barra inferior fija con cuatro pestañas:
 
 1. `Budines`: activación, carga de ventas, resumen, registros y baja lógica.
 2. `Truco`: anotador argentino a 30 puntos para `Nosotros` y `Ellos`.
-3. `Metrónomo`: metrónomo 4/4 normal y por bloques.
+3. `Metrónomo`: metrónomo 4/4 normal y canciones locales por partes.
 4. `Afinador`: afinador cromático para guitarra, bajo y afinaciones alternativas.
 
 Cambiar de pestaña no recarga la página. Budines conserva autenticación, D1, registros, resumen y eliminación lógica. Las otras tres herramientas son locales al dispositivo y no escriben en D1.
@@ -48,14 +48,15 @@ Cambiar de pestaña no recarga la página. Budines conserva autenticación, D1, 
 - Iniciar, Pausar/Reanudar, Stop, Tap Tempo y volumen.
 - El audio se programa con Web Audio API usando anticipación sobre `AudioContext.currentTime`.
 - El primer pulso del compás está acentuado.
-- `Configurar` permite agregar, editar, eliminar y reordenar bloques con `Nombre de la parte`, `Compases` y `BPM`.
+- `Configurar` permite nombrar la canción y agregar, editar, eliminar y reordenar hasta 32 partes con `Nombre de la parte`, `Compases` y `BPM`.
+- Cada parte nueva nace con nombre correlativo `Parte 1` a `Parte 32`; tocar el nombre lo convierte en input inline y Escape cancela la edición.
 - Las canciones se guardan como biblioteca local `Mis canciones`, con identificador estable, nombre, bloques ordenados, fecha técnica de creación/modificación y versión de esquema.
 - Cada bloque guarda identificador estable, nombre escrito por el usuario, compases, BPM y orden dentro de la canción.
 - `Guardar canción` actualiza la canción abierta sin duplicarla; `Guardar como nueva` crea una copia deliberada con otro identificador.
 - Antes de cada bloque se anuncia el nombre con Web Speech API, se muestra `Próximo`, se ejecuta cuenta previa `3, 2, 1` al BPM entrante y después comienza el primer pulso acentuado.
 - La cuenta previa no consume compases y ocurre antes del primer bloque, entre bloques y al volver del último al primero.
 - La secuencia por bloques cambia BPM solo en el límite de bloque, vuelve al primer bloque al terminar y se repite hasta Stop.
-- BPM, volumen, secuencia actual y canciones se guardan exclusivamente en `localStorage`; no usan D1 ni la base comercial.
+- BPM, volumen, anuncios, voz seleccionada, secuencia actual y canciones se guardan exclusivamente en `localStorage`; no usan D1 ni la base comercial.
 - La voz prefiere `es-AR`, cae a otra voz en español y finalmente a cualquier voz disponible. Si `speechSynthesis` no existe o el navegador demora voces, el metrónomo sigue con clicks y cuenta visual.
 - La Web Speech API depende del navegador y del dispositivo: la voz puede variar o tener pequeñas latencias, pero la precisión temporal depende de Web Audio.
 - El modelo local queda preparado para una futura migración a cuentas o backend, pero esta versión no sincroniza canciones entre dispositivos.
