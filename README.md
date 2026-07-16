@@ -48,9 +48,17 @@ Cambiar de pestaña no recarga la página. Budines conserva autenticación, D1, 
 - Iniciar, Pausar/Reanudar, Stop, Tap Tempo y volumen.
 - El audio se programa con Web Audio API usando anticipación sobre `AudioContext.currentTime`.
 - El primer pulso del compás está acentuado.
-- `Configurar` permite agregar, editar, eliminar y reordenar bloques de `compases + BPM`.
-- La secuencia por bloques cambia BPM en el primer pulso del compás siguiente, vuelve al primer bloque al terminar y se repite hasta Stop.
-- BPM, volumen y secuencia se guardan localmente.
+- `Configurar` permite agregar, editar, eliminar y reordenar bloques con `Nombre de la parte`, `Compases` y `BPM`.
+- Las canciones se guardan como biblioteca local `Mis canciones`, con identificador estable, nombre, bloques ordenados, fecha técnica de creación/modificación y versión de esquema.
+- Cada bloque guarda identificador estable, nombre escrito por el usuario, compases, BPM y orden dentro de la canción.
+- `Guardar canción` actualiza la canción abierta sin duplicarla; `Guardar como nueva` crea una copia deliberada con otro identificador.
+- Antes de cada bloque se anuncia el nombre con Web Speech API, se muestra `Próximo`, se ejecuta cuenta previa `3, 2, 1` al BPM entrante y después comienza el primer pulso acentuado.
+- La cuenta previa no consume compases y ocurre antes del primer bloque, entre bloques y al volver del último al primero.
+- La secuencia por bloques cambia BPM solo en el límite de bloque, vuelve al primer bloque al terminar y se repite hasta Stop.
+- BPM, volumen, secuencia actual y canciones se guardan exclusivamente en `localStorage`; no usan D1 ni la base comercial.
+- La voz prefiere `es-AR`, cae a otra voz en español y finalmente a cualquier voz disponible. Si `speechSynthesis` no existe o el navegador demora voces, el metrónomo sigue con clicks y cuenta visual.
+- La Web Speech API depende del navegador y del dispositivo: la voz puede variar o tener pequeñas latencias, pero la precisión temporal depende de Web Audio.
+- El modelo local queda preparado para una futura migración a cuentas o backend, pero esta versión no sincroniza canciones entre dispositivos.
 
 ### Afinador
 
@@ -208,7 +216,7 @@ Validación completa:
 npm run validate
 ```
 
-Las pruebas cubren regresión de Budines, navegación de las cuatro pestañas, reglas de Truco, representación con Joint, validación y avance del metrónomo, conversión/detección del afinador y liberación de pistas. La calidad acústica final del metrónomo y del afinador debe comprobarse en un dispositivo físico con parlante y micrófono.
+Las pruebas cubren regresión de Budines, navegación de las cuatro pestañas, reglas de Truco, representación con Joint, canciones guardadas del metrónomo, bloques nombrados, cuenta previa, máquina de reproducción, selección de voz, conversión/detección del afinador y liberación de pistas. La calidad acústica final del metrónomo, la voz hablada y el afinador debe comprobarse en un dispositivo físico con parlante y micrófono.
 
 ## Despliegue en Cloudflare Pages
 

@@ -338,6 +338,11 @@ select:disabled {
   min-height: 420px;
 }
 
+#metronome-tool {
+  display: grid;
+  gap: 14px;
+}
+
 .switch-button {
   border: 1px solid var(--line);
   background: transparent;
@@ -454,6 +459,17 @@ body[data-active-tool="truco"] #truco-tool {
 
 .tool-status.is-active {
   color: var(--accent-dark);
+}
+
+.status-pill {
+  align-self: start;
+  border: 1px solid #d5a642;
+  border-radius: 8px;
+  background: #fff4da;
+  color: #7a5a14;
+  padding: 5px 8px;
+  font-size: 0.76rem;
+  font-weight: 900;
 }
 
 .button-grid {
@@ -790,6 +806,42 @@ body[data-active-tool="truco"] #truco-tool {
   gap: 12px;
 }
 
+.metronome-announcer {
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  min-height: 112px;
+  padding: 12px;
+  border: 1px solid #dfd1bf;
+  border-radius: 8px;
+  background: #fffaf2;
+  text-align: center;
+}
+
+.metronome-announcer p,
+.metronome-announcer strong,
+.metronome-announcer span {
+  margin: 0;
+}
+
+.metronome-announcer p {
+  color: var(--muted);
+  font-weight: 850;
+}
+
+.metronome-announcer strong {
+  color: var(--ink);
+  font-size: 2.8rem;
+  font-weight: 950;
+  line-height: 0.95;
+}
+
+.metronome-announcer span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
 .pulse-indicator {
   width: 88px;
   height: 88px;
@@ -813,7 +865,7 @@ body[data-active-tool="truco"] #truco-tool {
 
 .metronome-block-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 42px 42px 42px;
+  grid-template-columns: minmax(136px, 1.5fr) minmax(76px, 0.75fr) minmax(76px, 0.75fr) 42px 42px 42px;
   gap: 8px;
   align-items: end;
 }
@@ -842,6 +894,69 @@ body[data-active-tool="truco"] #truco-tool {
   background: #fffaf2;
   color: var(--muted);
   font-size: 1.15rem;
+}
+
+.song-list {
+  display: grid;
+  gap: 10px;
+}
+
+.song-card {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #dfd1bf;
+  border-radius: 8px;
+  background: #fffaf2;
+  padding: 12px;
+}
+
+.song-card.is-active {
+  border-color: var(--accent);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.song-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.song-card-title {
+  margin: 0;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+  font-weight: 900;
+}
+
+.song-card-meta {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 750;
+}
+
+.song-card-count {
+  align-self: start;
+  border-radius: 8px;
+  background: #e8ded0;
+  color: var(--muted);
+  padding: 4px 8px;
+  font-size: 0.76rem;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.song-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.song-actions .quiet-button,
+.song-actions .danger-button {
+  min-width: 0;
+  padding: 0 8px;
+  font-size: 0.84rem;
 }
 
 .dialog-panel--wide {
@@ -1098,6 +1213,20 @@ body[data-active-tool="truco"] #truco-tool {
 
   .tool-controls {
     grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .metronome-block-row {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .compact-field--name {
+    grid-column: 1 / -1;
+  }
+
+  .song-actions {
+    grid-template-columns: 1fr;
   }
 }
 

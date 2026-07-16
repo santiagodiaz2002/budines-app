@@ -23,7 +23,9 @@
 - Ventas y saldos iniciales activos pueden eliminarse desde la interfaz mediante baja lógica confirmada.
 - Truco, Metrónomo y Afinador son herramientas exclusivamente locales del dispositivo y no usan D1.
 - Truco es un anotador argentino a 30 puntos para Nosotros y Ellos; representa puntos con instancias de `public/media/joint.jpg`.
-- El metrónomo funciona en 4/4 con modo normal y configuración por bloques que se repite hasta Stop.
+- El metrónomo funciona en 4/4 con BPM manual, Tap Tempo, volumen, canciones guardadas localmente, bloques con nombre y configuración por bloques que se repite hasta Stop.
+- Cada bloque del metrónomo anuncia su nombre con Web Speech API y ejecuta una cuenta previa `3, 2, 1` al BPM entrante antes de reproducir compases.
+- Las canciones del metrónomo viven solo en `localStorage` con esquema versionado y pueden migrarse a cuentas en el futuro, pero no usan D1 ni sincronización en esta versión.
 - El afinador es cromático, usa referencia A4 = 440 Hz y no depende de una afinación fija.
 - No inventar gramos, usuario ni fecha comercial de los saldos iniciales.
 - No borrar físicamente registros desde la interfaz ni desde la API.
@@ -33,6 +35,7 @@
 - No versionar `.dev.vars`, secretos reales, tokens ni credenciales.
 - No registrar códigos de activación ni tokens en logs.
 - No enviar, grabar ni almacenar audio del afinador; el micrófono se pide solo al iniciar el afinador y se liberan los tracks al detener.
+- No descargar audios externos ni enviar textos/audio de anuncios del metrónomo; Web Speech API se usa localmente en el navegador.
 - No permitir que metrónomo y afinador queden ejecutándose simultáneamente.
 - Usar consultas parametrizadas para todo dato de usuario.
 - Renderizar en frontend con `textContent` o creación segura de nodos; no insertar HTML de la API.

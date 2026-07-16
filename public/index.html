@@ -235,7 +235,20 @@
 
             <div class="metronome-display" aria-live="polite">
               <div id="metronome-indicator" class="pulse-indicator" aria-hidden="true"></div>
+              <div class="metronome-announcer">
+                <p id="metronome-announcement">Próximo: Intro</p>
+                <strong id="metronome-count">Listo</strong>
+                <span>BPM entrante <b id="metronome-incoming-bpm">100</b></span>
+              </div>
               <dl class="metrics-grid">
+                <div>
+                  <dt>Canción</dt>
+                  <dd id="metronome-song-now">Sin guardar</dd>
+                </div>
+                <div>
+                  <dt>Parte</dt>
+                  <dd id="metronome-part-now">Intro</dd>
+                </div>
                 <div>
                   <dt>Pulso</dt>
                   <dd id="metronome-pulse">1/4</dd>
@@ -251,6 +264,10 @@
                 <div>
                   <dt>BPM actual</dt>
                   <dd id="metronome-bpm-now">100</dd>
+                </div>
+                <div>
+                  <dt>Siguiente</dt>
+                  <dd id="metronome-next-part">Verso</dd>
                 </div>
               </dl>
             </div>
@@ -273,6 +290,34 @@
               <button id="metronome-tap" class="quiet-button" type="button">Tap Tempo</button>
             </div>
             <p id="metronome-status" class="tool-status" role="status"></p>
+          </section>
+
+          <section class="panel tool-card metronome-editor-panel" aria-labelledby="metronome-editor-title">
+            <div class="panel-heading row-heading">
+              <div>
+                <p class="eyebrow">Editor</p>
+                <h2 id="metronome-editor-title">Canción actual</h2>
+              </div>
+              <span id="metronome-unsaved" class="status-pill" hidden>Cambios sin guardar</span>
+            </div>
+            <p id="metronome-current-song" class="tool-status">Configuración suelta</p>
+            <div class="button-grid two">
+              <button id="metronome-save-song" class="primary-button" type="button">Guardar canción</button>
+              <button id="metronome-save-song-as" class="secondary-button" type="button">Guardar como nueva</button>
+            </div>
+          </section>
+
+          <section class="panel tool-card metronome-library-panel" aria-labelledby="metronome-library-title">
+            <div class="panel-heading row-heading">
+              <div>
+                <p class="eyebrow">Biblioteca</p>
+                <h2 id="metronome-library-title">Mis canciones</h2>
+              </div>
+              <button id="metronome-new-song" class="quiet-button" type="button">Nueva canción</button>
+            </div>
+            <p id="metronome-song-message" class="tool-status" role="status"></p>
+            <p id="metronome-song-empty" class="input-preview">Todavía no hay canciones guardadas.</p>
+            <div id="metronome-song-list" class="song-list"></div>
           </section>
         </section>
 
@@ -384,7 +429,7 @@
     <div id="metronome-config-dialog" class="dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="metronome-config-title" hidden>
       <div class="dialog-panel dialog-panel--wide">
         <h2 id="metronome-config-title">Configurar bloques</h2>
-        <p class="dialog-copy">Cada bloque define cuántos compases toca y a qué BPM. La secuencia se repite hasta Stop.</p>
+        <p class="dialog-copy">Cada bloque tiene nombre, compases y BPM. Antes de cada parte se anuncia el nombre y una cuenta previa.</p>
         <div id="metronome-block-list" class="metronome-block-list"></div>
         <p id="metronome-config-error" class="form-message" role="status"></p>
         <div class="dialog-actions dialog-actions--stack">
@@ -392,6 +437,35 @@
           <button id="metronome-restore-blocks" class="quiet-button" type="button">Restaurar predeterminada</button>
           <button id="metronome-cancel-blocks" class="secondary-button" type="button">Cancelar</button>
           <button id="metronome-save-blocks" class="primary-button" type="button">Guardar</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="metronome-name-dialog" class="dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="metronome-name-title" hidden>
+      <div class="dialog-panel">
+        <h2 id="metronome-name-title">Guardar canción</h2>
+        <p id="metronome-name-copy" class="dialog-copy"></p>
+        <form id="metronome-name-form" class="stack" novalidate>
+          <label class="field">
+            <span>Nombre</span>
+            <input id="metronome-name-input" type="text" maxlength="60" autocomplete="off" required>
+          </label>
+          <p id="metronome-name-error" class="form-message" role="status"></p>
+          <div class="dialog-actions">
+            <button id="metronome-name-cancel" class="quiet-button" type="button">Cancelar</button>
+            <button id="metronome-name-confirm" class="primary-button" type="submit">Guardar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div id="metronome-confirm-dialog" class="dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="metronome-confirm-title" hidden>
+      <div class="dialog-panel">
+        <h2 id="metronome-confirm-title">Confirmar</h2>
+        <p id="metronome-confirm-copy" class="dialog-copy"></p>
+        <div class="dialog-actions">
+          <button id="metronome-confirm-cancel" class="quiet-button" type="button">Cancelar</button>
+          <button id="metronome-confirm-accept" class="danger-button" type="button">Confirmar</button>
         </div>
       </div>
     </div>
