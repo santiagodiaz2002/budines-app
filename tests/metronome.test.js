@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  MAX_PARTS,
   advancePlaybackRuntime,
   advanceRuntime,
   cloneSongAsNew,
+  createDefaultNamedBlock,
   createMetronomeMachine,
   createPlaybackRuntime,
   createRuntime,
@@ -16,6 +18,7 @@ import {
   parseBpm,
   parseMeasures,
   parsePartName,
+  parseSongName,
   renameSongInLibrary,
   removeBlock,
   sanitizeSongLibrary,
@@ -151,6 +154,7 @@ describe('metrónomo 4/4', () => {
 
   it('valida nombres y conserva canciones validas ante datos locales corruptos', () => {
     expect(createSong({ name: '', blocks: [{ name: 'Intro', measures: '1', bpm: '100' }] }).ok).toBe(false);
+    expect(parseSongName('A'.repeat(81)).ok).toBe(false);
     expect(parsePartName('   ').ok).toBe(false);
     expect(parsePartName('A'.repeat(41)).ok).toBe(false);
     expect(parsePartName('Coro <script>alert(1)</script>')).toEqual({
@@ -164,10 +168,11 @@ describe('metrónomo 4/4', () => {
       blocks: [{ name: 'Intro', measures: '1', bpm: '100' }],
       idFactory
     }).song;
+    const validV1 = { ...valid, schemaVersion: 1 };
     const library = sanitizeSongLibrary({
       schemaVersion: 1,
       songs: [
-        valid,
+        validV1,
         { schemaVersion: 1, id: 'rota', name: 'Rota', blocks: [{ name: '', measures: 1, bpm: 100 }] },
         { schemaVersion: 999, id: 'futura', name: 'Futura', blocks: valid.blocks }
       ]
@@ -175,6 +180,8 @@ describe('metrónomo 4/4', () => {
 
     expect(library.songs).toHaveLength(1);
     expect(library.songs[0].name).toBe('Valida');
+    expect(library.songs[0].schemaVersion).toBe(2);
+    expect(library.migratedCount).toBe(1);
   });
 
   it('edita bloques con nombre, validacion estricta, reordenamiento y minimo de un bloque', () => {
@@ -201,6 +208,31 @@ describe('metrónomo 4/4', () => {
     expect(removed.ok).toBe(true);
     expect(removed.blocks).toHaveLength(1);
     expect(removeBlock(removed.blocks, 0).ok).toBe(false);
+  });
+
+  it('limita canciones a 32 partes y genera nombres correlativos sin sobrescribir nombres personalizados', () => {
+    const idFactory = createDeterministicIds();
+    let blocks = [];
+    for (let index = 0; index < MAX_PARTS; index += 1) {
+      blocks.push(createDefaultNamedBlock(blocks, 100, { idFactory }));
+    }
+
+    expect(blocks).toHaveLength(32);
+    expect(blocks[0].name).toBe('Parte 1');
+    expect(blocks[31].name).toBe('Parte 32');
+    expect(validateEditableBlocks(blocks, { idFactory }).ok).toBe(true);
+    expect(validateEditableBlocks([...blocks, createDefaultNamedBlock(blocks, 100, { idFactory })]).ok).toBe(false);
+
+    const custom = [
+      { id: 'a', name: 'Intro', measures: 1, bpm: 80, order: 0 },
+      { id: 'b', name: 'Parte 2', measures: 1, bpm: 90, order: 1 }
+    ];
+    expect(createDefaultNamedBlock([{ id: 'a', name: 'Intro', measures: 1, bpm: 80, order: 0 }], 100, { idFactory }).name).toBe('Parte 2');
+    expect(createDefaultNamedBlock(custom, 100, { idFactory }).name).toBe('Parte 3');
+    expect(createDefaultNamedBlock([
+      { id: 'a', name: 'Parte 1', measures: 1, bpm: 80, order: 0 },
+      { id: 'b', name: 'Parte 3', measures: 1, bpm: 90, order: 1 }
+    ], 100, { idFactory }).name).toBe('Parte 2');
   });
 
   it('detecta cambios sin guardar comparando la secuencia editable', () => {

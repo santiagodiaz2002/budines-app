@@ -15,9 +15,9 @@ import {
   formatRecordType
 } from './format.js';
 import { createAudioCoordinator } from './audio-coordinator.js';
-import { initMetronome } from './metronome.js';
+import { initMetronome } from './metronome-editor.js?v=metronome-fix-20260716c';
 import { initToolNavigation } from './navigation.js';
-import { initTruco } from './truco.js';
+import { initTruco } from './truco.js?v=metronome-fix-20260716c';
 import { initTuner } from './tuner.js';
 import { parsePositiveIntegerText, validateSaleFields } from './validation.js';
 
@@ -82,10 +82,19 @@ function init() {
 
 function initLocalTools() {
   const audioCoordinator = createAudioCoordinator();
-  initToolNavigation();
-  initTruco();
-  initMetronome(document.querySelector('#metronome-tool'), audioCoordinator);
-  initTuner(document.querySelector('#tuner-tool'), audioCoordinator);
+  initToolSafely('navegación', () => initToolNavigation());
+  initToolSafely('truco', () => initTruco());
+  initToolSafely('metrónomo', () => initMetronome(document.querySelector('#metronome-tool'), audioCoordinator));
+  initToolSafely('afinador', () => initTuner(document.querySelector('#tuner-tool'), audioCoordinator));
+}
+
+function initToolSafely(name, initializer) {
+  try {
+    return initializer();
+  } catch (error) {
+    console.error(`No se pudo iniciar ${name}.`, error);
+    return null;
+  }
 }
 
 function bindEvents() {

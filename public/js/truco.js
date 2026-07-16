@@ -191,14 +191,16 @@ export function initTruco(root = document.querySelector('#truco-tool')) {
   });
 
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && !dom.dialog.hidden) {
+    if (event.key === 'Escape' && dom.dialog && !dom.dialog.hidden) {
       closeDialog();
     }
   });
 
   function closeDialog() {
-    dom.dialog.hidden = true;
-    dom.reset.focus();
+    if (dom.dialog) {
+      dom.dialog.hidden = true;
+    }
+    dom.reset?.focus();
   }
 
   function render() {
@@ -209,10 +211,17 @@ export function initTruco(root = document.querySelector('#truco-tool')) {
       }
 
       const score = state.scores[team];
-      teamRoot.querySelector('[data-truco-score]').textContent = String(score);
+      const scoreNode = teamRoot.querySelector('[data-truco-score]');
+      if (scoreNode) {
+        scoreNode.textContent = String(score);
+      }
       const controls = dom.controls.get(team);
-      controls.minus.disabled = score <= MIN_SCORE;
-      controls.plus.disabled = score >= MAX_SCORE;
+      if (controls?.minus) {
+        controls.minus.disabled = score <= MIN_SCORE;
+      }
+      if (controls?.plus) {
+        controls.plus.disabled = score >= MAX_SCORE;
+      }
 
       const groups = createBoardGroups(score);
       for (const groupRoot of teamRoot.querySelectorAll('[data-truco-group]')) {
@@ -227,9 +236,13 @@ export function initTruco(root = document.querySelector('#truco-tool')) {
     }
 
     const winner = getTrucoWinner(state.scores);
-    dom.winner.textContent = winner ? `Ganó ${winner}` : 'Partida a 30 puntos';
-    dom.winner.classList.toggle('is-active', Boolean(winner));
-    dom.undo.disabled = state.history.length === 0;
+    if (dom.winner) {
+      dom.winner.textContent = winner ? `Ganó ${winner}` : 'Partida a 30 puntos';
+      dom.winner.classList.toggle('is-active', Boolean(winner));
+    }
+    if (dom.undo) {
+      dom.undo.disabled = state.history.length === 0;
+    }
   }
 
   render();

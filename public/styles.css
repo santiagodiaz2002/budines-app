@@ -863,11 +863,67 @@ body[data-active-tool="truco"] #truco-tool {
   padding-right: 2px;
 }
 
+.metronome-config-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 0 10px;
+}
+
 .metronome-block-row {
   display: grid;
   grid-template-columns: minmax(136px, 1.5fr) minmax(76px, 0.75fr) minmax(76px, 0.75fr) 42px 42px 42px;
   gap: 8px;
   align-items: end;
+}
+
+.metronome-part-card {
+  border: 1px solid #dfd1bf;
+  border-radius: 8px;
+  background: #fffaf2;
+  padding: 10px;
+}
+
+.part-name-wrap {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.compact-label {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.part-name-button {
+  min-height: 42px;
+  width: 100%;
+  border: 1px solid #c9bca7;
+  border-radius: 8px;
+  background: #fffaf2;
+  color: var(--ink);
+  padding: 9px;
+  text-align: left;
+  overflow-wrap: anywhere;
+  font-weight: 850;
+}
+
+.part-name-edit {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 42px 42px;
+  gap: 6px;
+}
+
+.part-name-edit input {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid #c9bca7;
+  border-radius: 8px;
+  background: #fffaf2;
+  color: var(--ink);
+  padding: 9px;
 }
 
 .compact-field {
@@ -894,6 +950,36 @@ body[data-active-tool="truco"] #truco-tool {
   background: #fffaf2;
   color: var(--muted);
   font-size: 1.15rem;
+}
+
+.metronome-voice-settings {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid #dfd1bf;
+  border-radius: 8px;
+  background: #fffaf2;
+}
+
+.metronome-voice-settings h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 1rem;
+}
+
+.check-field {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.check-field input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent);
 }
 
 .song-list {
@@ -1137,16 +1223,21 @@ body[data-active-tool="truco"] #truco-tool {
   display: grid;
   align-items: end;
   padding: 18px 16px calc(18px + env(safe-area-inset-bottom));
+  overflow-y: auto;
   background: rgba(0, 0, 0, 0.62);
 }
 
 .dialog-panel {
   width: min(100%, 520px);
+  max-height: calc(100vh - 36px - env(safe-area-inset-bottom));
+  max-height: calc(100dvh - 36px - env(safe-area-inset-bottom));
   margin: 0 auto;
   border-radius: 8px;
   background: var(--card);
   color: var(--ink);
   padding: 18px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   box-shadow: var(--shadow);
 }
 
@@ -1219,6 +1310,10 @@ body[data-active-tool="truco"] #truco-tool {
 @media (max-width: 560px) {
   .metronome-block-row {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .part-name-wrap {
+    grid-column: 1 / -1;
   }
 
   .compact-field--name {
