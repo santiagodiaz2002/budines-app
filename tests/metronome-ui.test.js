@@ -86,6 +86,8 @@ describe('interfaz del metrónomo con canciones', () => {
     expect(document.querySelectorAll('[data-metronome-block-row]')).toHaveLength(32);
     expect(document.querySelector('#metronome-part-count').textContent).toBe('32 de 32 partes');
     expect(document.querySelector('#metronome-add-block').disabled).toBe(true);
+    expect(document.querySelector('#metronome-restart').textContent).toBe('Reiniciar');
+    expect(document.querySelector('#metronome-restart').disabled).toBe(false);
 
     click('#metronome-test-voice');
     await waitFor(() => document.querySelector('#metronome-status').textContent.length > 0);

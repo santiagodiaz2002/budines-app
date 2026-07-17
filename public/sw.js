@@ -1,15 +1,15 @@
-const CACHE_NAME = 'budines-shell-v14';
+const CACHE_NAME = 'budines-shell-v15';
 const SHELL_ASSETS = [
   '/',
   '/index.html',
-  '/styles.css?v=metronome-fix-20260716c',
+  '/styles.css?v=metronome-continuous-20260716',
   '/js/audio-coordinator.js',
   '/js/api.js',
-  '/js/app.js?v=metronome-fix-20260716c',
+  '/js/app.js?v=metronome-continuous-20260716',
   '/js/format.js',
   '/js/metronome-core.js',
-  '/js/metronome-core-v2.js',
-  '/js/metronome-editor.js?v=metronome-fix-20260716c',
+  '/js/metronome-core-v2.js?v=metronome-continuous-20260716',
+  '/js/metronome-editor.js?v=metronome-continuous-20260716',
   '/js/metronome.js',
   '/js/navigation.js',
   '/js/truco.js?v=metronome-fix-20260716c',

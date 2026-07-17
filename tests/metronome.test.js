@@ -12,6 +12,7 @@ import {
   createSongPlaybackMachine,
   deleteSongFromLibrary,
   findSong,
+  getAnnouncementWord,
   hasUnsavedBlockChanges,
   moveBlock,
   normalizeBlocks,
@@ -244,38 +245,58 @@ describe('metrónomo 4/4', () => {
     expect(hasUnsavedBlockChanges(changed, saved)).toBe(true);
   });
 
-  it('anuncia, cuenta tres pulsos al BPM entrante, reproduce y cambia de bloque en limite', () => {
+  it('reproduce canciones con count-in inicial y anuncios superpuestos sin agregar compases', () => {
     const blocks = normalizeBlocks([
-      { id: 'intro', name: 'Intro', measures: 1, bpm: 80, order: 0 },
-      { id: 'verso', name: 'Verso', measures: 1, bpm: 100, order: 1 }
+      { id: 'intro', name: 'Intro', measures: 2, bpm: 80, order: 0 },
+      { id: 'verso', name: 'Verso', measures: 2, bpm: 100, order: 1 },
+      { id: 'coro', name: 'Coro', measures: 2, bpm: 140, order: 2 },
+      { id: 'outro', name: 'Outro', measures: 1, bpm: 60, order: 3 }
     ]);
-    let runtime = createPlaybackRuntime(blocks);
+    const events = collectPlaybackEvents(blocks, 40);
 
-    expect(runtime).toMatchObject({ phase: 'announce', blockIndex: 0, bpm: 80 });
+    expect(events.slice(0, 4)).toEqual([
+      expect.objectContaining({ part: 'Intro', measure: 'count-in', pulse: 1, bpm: 80, word: 'Intro', timestamp: 0 }),
+      expect.objectContaining({ part: 'Intro', measure: 'count-in', pulse: 2, bpm: 80, word: 'Tres', timestamp: 0.75 }),
+      expect.objectContaining({ part: 'Intro', measure: 'count-in', pulse: 3, bpm: 80, word: 'Dos', timestamp: 1.5 }),
+      expect.objectContaining({ part: 'Intro', measure: 'count-in', pulse: 4, bpm: 80, word: 'Uno', timestamp: 2.25 })
+    ]);
 
-    runtime = advancePlaybackRuntime(runtime, blocks);
-    expect(runtime).toMatchObject({ phase: 'countIn', countInBeat: 3, measureInBlock: 1, bpm: 80 });
-    runtime = advancePlaybackRuntime(runtime, blocks);
-    expect(runtime).toMatchObject({ phase: 'countIn', countInBeat: 2, bpm: 80 });
-    runtime = advancePlaybackRuntime(runtime, blocks);
-    expect(runtime).toMatchObject({ phase: 'countIn', countInBeat: 1, bpm: 80 });
+    expect(events[4]).toMatchObject({ part: 'Intro', measure: 1, pulse: 1, bpm: 80, word: null, timestamp: 3 });
 
-    runtime = advancePlaybackRuntime(runtime, blocks);
-    expect(runtime).toMatchObject({ phase: 'playing', blockIndex: 0, measureInBlock: 1, beatInMeasure: 1, bpm: 80 });
+    const introLastMeasure = events.slice(8, 12);
+    expect(introLastMeasure).toEqual([
+      expect.objectContaining({ part: 'Intro', measure: 2, pulse: 1, bpm: 80, word: 'Verso' }),
+      expect.objectContaining({ part: 'Intro', measure: 2, pulse: 2, bpm: 80, word: 'Tres' }),
+      expect.objectContaining({ part: 'Intro', measure: 2, pulse: 3, bpm: 80, word: 'Dos' }),
+      expect.objectContaining({ part: 'Intro', measure: 2, pulse: 4, bpm: 80, word: 'Uno' })
+    ]);
+    expect(events[12]).toMatchObject({ part: 'Verso', measure: 1, pulse: 1, bpm: 100, word: null, timestamp: 9 });
 
-    runtime = advancePlaybackRuntime(runtime, blocks);
-    runtime = advancePlaybackRuntime(runtime, blocks);
-    runtime = advancePlaybackRuntime(runtime, blocks);
-    expect(runtime).toMatchObject({ phase: 'playing', blockIndex: 0, beatInMeasure: 4, bpm: 80 });
+    expect(events.slice(16, 20)).toEqual([
+      expect.objectContaining({ part: 'Verso', measure: 2, pulse: 1, bpm: 100, word: 'Coro' }),
+      expect.objectContaining({ part: 'Verso', measure: 2, pulse: 2, bpm: 100, word: 'Tres' }),
+      expect.objectContaining({ part: 'Verso', measure: 2, pulse: 3, bpm: 100, word: 'Dos' }),
+      expect.objectContaining({ part: 'Verso', measure: 2, pulse: 4, bpm: 100, word: 'Uno' })
+    ]);
+    expect(events[20]).toMatchObject({ part: 'Coro', measure: 1, pulse: 1, bpm: 140, word: null });
 
-    runtime = advancePlaybackRuntime(runtime, blocks);
-    expect(runtime).toMatchObject({ phase: 'announce', blockIndex: 1, bpm: 100 });
+    expect(events.slice(24, 28)).toEqual([
+      expect.objectContaining({ part: 'Coro', measure: 2, pulse: 1, bpm: 140, word: 'Outro' }),
+      expect.objectContaining({ part: 'Coro', measure: 2, pulse: 2, bpm: 140, word: 'Tres' }),
+      expect.objectContaining({ part: 'Coro', measure: 2, pulse: 3, bpm: 140, word: 'Dos' }),
+      expect.objectContaining({ part: 'Coro', measure: 2, pulse: 4, bpm: 140, word: 'Uno' })
+    ]);
+    expect(events[28]).toMatchObject({ part: 'Outro', measure: 1, pulse: 1, bpm: 60, word: 'Intro' });
+    expect(events[29]).toMatchObject({ part: 'Outro', measure: 1, pulse: 2, bpm: 60, word: 'Tres' });
+    expect(events[30]).toMatchObject({ part: 'Outro', measure: 1, pulse: 3, bpm: 60, word: 'Dos' });
+    expect(events[31]).toMatchObject({ part: 'Outro', measure: 1, pulse: 4, bpm: 60, word: 'Uno' });
+    expect(events[32]).toMatchObject({ part: 'Intro', measure: 1, pulse: 1, bpm: 80, word: null });
 
-    runtime = advancePlaybackRuntime(runtime, blocks);
-    expect(runtime).toMatchObject({ phase: 'countIn', countInBeat: 3, bpm: 100 });
+    expect(events.map((event) => event.timestamp)).toEqual([...events.map((event) => event.timestamp)].sort((left, right) => left - right));
+    expect(events.some((event) => event.phase === 'announce')).toBe(false);
   });
 
-  it('vuelve del ultimo bloque al primero y la maquina evita schedulers duplicados', () => {
+  it('stop, pausa y reiniciar mantienen estado consistente sin duplicar scheduler', () => {
     const blocks = normalizeBlocks([
       { id: 'intro', name: 'Intro', measures: 1, bpm: 80, order: 0 },
       { id: 'coro', name: 'Coro', measures: 1, bpm: 120, order: 1 }
@@ -288,30 +309,54 @@ describe('metrónomo 4/4', () => {
 
     machine.tick();
     machine.tick();
-    machine.tick();
-    machine.tick();
-    machine.tick();
-    machine.tick();
-    machine.tick();
-    machine.tick();
-    expect(machine.snapshot().runtime).toMatchObject({ phase: 'announce', blockIndex: 1, bpm: 120 });
+    expect(machine.snapshot().runtime).toMatchObject({ phase: 'countIn', blockIndex: 0, countInBeat: 2, bpm: 80 });
 
     expect(machine.pause()).toBe(true);
     const paused = machine.snapshot().runtime;
     expect(machine.resume()).toBe(true);
     expect(machine.snapshot().runtime).toEqual(paused);
 
-    for (let index = 0; index < 8; index += 1) {
+    for (let index = 0; index < 6; index += 1) {
       machine.tick();
     }
-    expect(machine.snapshot().runtime).toMatchObject({ phase: 'announce', blockIndex: 0, bpm: 80 });
+    expect(machine.snapshot().runtime).toMatchObject({ phase: 'playing', blockIndex: 1, measureInBlock: 1, beatInMeasure: 1, bpm: 120 });
+
+    expect(machine.restart()).toBe(true);
+    expect(machine.start()).toBe(false);
+    expect(machine.snapshot()).toMatchObject({
+      running: true,
+      paused: false,
+      schedulerActive: true,
+      runtime: { phase: 'countIn', blockIndex: 0, countInBeat: 4, bpm: 80 }
+    });
 
     machine.stop();
     expect(machine.snapshot()).toMatchObject({
       running: false,
       paused: false,
       schedulerActive: false,
-      runtime: { phase: 'announce', blockIndex: 0, bpm: 80 }
+      runtime: { phase: 'countIn', blockIndex: 0, countInBeat: 4, bpm: 80 }
+    });
+
+    expect(machine.restart()).toBe(true);
+    expect(machine.snapshot()).toMatchObject({
+      running: true,
+      paused: false,
+      schedulerActive: true,
+      runtime: { phase: 'countIn', blockIndex: 0, countInBeat: 4, bpm: 80 }
+    });
+
+    const pausedMachine = createSongPlaybackMachine(blocks);
+    pausedMachine.start();
+    pausedMachine.tick();
+    pausedMachine.pause();
+    expect(pausedMachine.snapshot()).toMatchObject({ running: true, paused: true });
+    expect(pausedMachine.restart()).toBe(true);
+    expect(pausedMachine.snapshot()).toMatchObject({
+      running: true,
+      paused: false,
+      schedulerActive: true,
+      runtime: { phase: 'countIn', blockIndex: 0, countInBeat: 4, bpm: 80 }
     });
   });
 
@@ -334,4 +379,25 @@ function createDeterministicIds() {
     index += 1;
     return `${prefix}-${index}`;
   };
+}
+
+function collectPlaybackEvents(blocks, count) {
+  let runtime = createPlaybackRuntime(blocks);
+  let timestamp = 0;
+  const events = [];
+  for (let index = 0; index < count; index += 1) {
+    const block = blocks[runtime.blockIndex];
+    events.push({
+      phase: runtime.phase,
+      part: block.name,
+      measure: runtime.phase === 'countIn' ? 'count-in' : runtime.measureInBlock,
+      pulse: runtime.phase === 'countIn' ? 5 - runtime.countInBeat : runtime.beatInMeasure,
+      bpm: runtime.bpm,
+      word: getAnnouncementWord(runtime, blocks),
+      timestamp: Number(timestamp.toFixed(6))
+    });
+    timestamp += 60 / runtime.bpm;
+    runtime = advancePlaybackRuntime(runtime, blocks);
+  }
+  return events;
 }

@@ -53,8 +53,8 @@ Cambiar de pestaña no recarga la página. Budines conserva autenticación, D1, 
 - Las canciones se guardan como biblioteca local `Mis canciones`, con identificador estable, nombre, bloques ordenados, fecha técnica de creación/modificación y versión de esquema.
 - Cada bloque guarda identificador estable, nombre escrito por el usuario, compases, BPM y orden dentro de la canción.
 - `Guardar canción` actualiza la canción abierta sin duplicarla; `Guardar como nueva` crea una copia deliberada con otro identificador.
-- Antes de cada bloque se anuncia el nombre con Web Speech API, se muestra `Próximo`, se ejecuta cuenta previa `3, 2, 1` al BPM entrante y después comienza el primer pulso acentuado.
-- La cuenta previa no consume compases y ocurre antes del primer bloque, entre bloques y al volver del último al primero.
+- Al iniciar una canción se ejecuta un count-in inicial de cuatro pulsos al BPM de la primera parte: nombre, `Tres`, `Dos`, `Uno`.
+- Entre partes no se agregan pausas ni compases: el último compás real de la parte saliente anuncia la próxima parte con nombre, `Tres`, `Dos`, `Uno`, y el BPM cambia en el primer pulso real de la parte entrante.
 - La secuencia por bloques cambia BPM solo en el límite de bloque, vuelve al primer bloque al terminar y se repite hasta Stop.
 - BPM, volumen, anuncios, voz seleccionada, secuencia actual y canciones se guardan exclusivamente en `localStorage`; no usan D1 ni la base comercial.
 - La voz prefiere `es-AR`, cae a otra voz en español y finalmente a cualquier voz disponible. Si `speechSynthesis` no existe o el navegador demora voces, el metrónomo sigue con clicks y cuenta visual.

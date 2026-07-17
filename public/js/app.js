@@ -15,7 +15,7 @@ import {
   formatRecordType
 } from './format.js';
 import { createAudioCoordinator } from './audio-coordinator.js';
-import { initMetronome } from './metronome-editor.js?v=metronome-fix-20260716c';
+import { initMetronome } from './metronome-editor.js?v=metronome-continuous-20260716';
 import { initToolNavigation } from './navigation.js';
 import { initTruco } from './truco.js?v=metronome-fix-20260716c';
 import { initTuner } from './tuner.js';
