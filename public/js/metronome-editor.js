@@ -9,6 +9,7 @@ import {
   createSong,
   deleteSongFromLibrary,
   findSong,
+  getAnnouncementWord,
   getCurrentBlock,
   getNextBlock,
   normalizeBlocks,
@@ -22,7 +23,7 @@ import {
   updateSong,
   upsertSongInLibrary,
   validateEditableBlocks
-} from './metronome-core-v2.js';
+} from './metronome-core-v2.js?v=metronome-continuous-20260716';
 
 const STORAGE_KEY = 'budines.metronome.v1';
 const SONGS_STORAGE_KEY = 'budines.metronome.songs.v2';
@@ -32,12 +33,7 @@ const DEFAULT_VOLUME = 0.65;
 const DEFAULT_VOICE_VOLUME = 1;
 const SCHEDULE_AHEAD_SECONDS = 0.12;
 const SCHEDULER_MS = 25;
-const ASSET_VERSION = 'metronome-fix-20260716c';
-const COUNT_WORDS = new Map([
-  [3, 'tres'],
-  [2, 'dos'],
-  [1, 'uno']
-]);
+const ASSET_VERSION = 'metronome-continuous-20260716';
 
 export function initMetronome(root = document.querySelector('#metronome-tool'), coordinator) {
   if (!root) {
@@ -81,7 +77,6 @@ export function initMetronome(root = document.querySelector('#metronome-tool'), 
     }),
     onBeat: handleBeat,
     onCountIn: handleCountIn,
-    onAnnounce: handleAnnounce,
     onStatus: setStatus
   });
 
@@ -109,6 +104,7 @@ export function initMetronome(root = document.querySelector('#metronome-tool'), 
     dom.start.addEventListener('click', start);
     dom.pause.addEventListener('click', togglePause);
     dom.stop.addEventListener('click', () => stop());
+    dom.restart?.addEventListener('click', restart);
     dom.tap.addEventListener('click', tapTempo);
     dom.bpm.addEventListener('change', handleBpmChange);
     dom.volume.addEventListener('input', handleVolumeChange);
@@ -213,8 +209,22 @@ export function initMetronome(root = document.querySelector('#metronome-tool'), 
     updateButtons();
   }
 
-  function handleAnnounce(scheduledRuntime) {
-    runtime = { ...scheduledRuntime };
+  async function restart() {
+    await requestAudioFocus();
+    const startRuntime = createPlaybackRuntime(playbackBlocks());
+    const started = await audio.restart({ runtime: startRuntime, blocks: playbackBlocks() });
+    if (!started) {
+      running = false;
+      paused = false;
+      updateButtons();
+      return;
+    }
+
+    running = true;
+    paused = false;
+    runtime = startRuntime;
+    setStatus('Metrónomo reiniciado.');
+    updateButtons();
     renderPlayback();
   }
 
@@ -722,31 +732,25 @@ export function initMetronome(root = document.querySelector('#metronome-tool'), 
     const currentBlock = getCurrentBlock(runtime, currentBlocks);
     const nextBlock = getNextBlock(runtime, currentBlocks);
     const song = getCurrentSong();
+    const isInitialCountIn = runtime.phase === 'countIn';
+    const announcementWord = getAnnouncementWord(runtime, currentBlocks);
 
     dom.songNow.textContent = songName || song?.name || 'Sin guardar';
     dom.partNow.textContent = currentBlock.name;
-    dom.nextPart.textContent = nextBlock.name;
-    dom.incomingBpm.textContent = String(currentBlock.bpm);
+    dom.nextPart.textContent = isInitialCountIn ? currentBlock.name : nextBlock.name;
+    dom.incomingBpm.textContent = String(isInitialCountIn ? currentBlock.bpm : nextBlock.bpm);
     dom.bpmNow.textContent = String(currentBlock.bpm);
     dom.block.textContent = `${runtime.blockIndex + 1}/${currentBlocks.length}`;
 
-    if (runtime.phase === 'announce') {
-      dom.announcement.textContent = `Próximo: ${currentBlock.name}`;
-      dom.count.textContent = 'Listo';
-      dom.pulse.textContent = '-/4';
-      dom.measure.textContent = 'Anuncio';
-      return;
-    }
-
     if (runtime.phase === 'countIn') {
       dom.announcement.textContent = `Próximo: ${currentBlock.name}`;
-      dom.count.textContent = String(runtime.countInBeat);
-      dom.pulse.textContent = String(runtime.countInBeat);
-      dom.measure.textContent = 'Cuenta';
+      dom.count.textContent = running ? announcementWord || 'Listo' : 'Listo';
+      dom.pulse.textContent = running ? `${5 - runtime.countInBeat}/4` : '-/4';
+      dom.measure.textContent = running ? 'Cuenta inicial' : 'Inicio';
       return;
     }
 
-    dom.announcement.textContent = `Tocando: ${currentBlock.name}`;
+    dom.announcement.textContent = announcementWord ? `Próximo: ${nextBlock.name}` : `Tocando: ${currentBlock.name}`;
     dom.count.textContent = String(runtime.beatInMeasure);
     dom.pulse.textContent = `${runtime.beatInMeasure}/${BEATS_PER_MEASURE}`;
     dom.measure.textContent = `${runtime.measureInBlock}/${currentBlock.measures}`;
@@ -1029,7 +1033,10 @@ export function initMetronome(root = document.querySelector('#metronome-tool'), 
     dom.start.disabled = running;
     dom.pause.disabled = !running;
     dom.pause.textContent = paused ? 'Reanudar' : 'Pausar';
-    dom.stop.disabled = !running && runtime.phase === 'announce' && runtime.blockIndex === 0;
+    dom.stop.disabled = !running;
+    if (dom.restart) {
+      dom.restart.disabled = false;
+    }
     dom.saveSong.disabled = saving;
     dom.saveSongAs.disabled = saving;
     dom.save.disabled = saving;
@@ -1153,24 +1160,22 @@ export function initMetronome(root = document.querySelector('#metronome-tool'), 
 }
 
 class MetronomeAudio {
-  constructor({ speech, getSpeechSettings, onBeat, onCountIn, onAnnounce, onStatus }) {
+  constructor({ speech, getSpeechSettings, onBeat, onCountIn, onStatus }) {
     this.speech = speech;
     this.getSpeechSettings = getSpeechSettings;
     this.onBeat = onBeat;
     this.onCountIn = onCountIn;
-    this.onAnnounce = onAnnounce;
     this.onStatus = onStatus;
     this.context = null;
     this.gain = null;
     this.timer = null;
-    this.transitionTimer = null;
     this.nextNoteTime = 0;
     this.runtime = null;
     this.blocks = [];
     this.volume = DEFAULT_VOLUME;
     this.sequence = 0;
     this.scheduledNodes = new Set();
-    this.announcing = false;
+    this.scheduledCallbacks = new Set();
   }
 
   setVolume(value) {
@@ -1181,7 +1186,7 @@ class MetronomeAudio {
   }
 
   async start({ runtime, blocks }) {
-    if (this.timer || this.transitionTimer || this.announcing) {
+    if (this.timer) {
       return false;
     }
 
@@ -1217,13 +1222,12 @@ class MetronomeAudio {
   pause() {
     this.sequence += 1;
     this.clearTimers();
-    this.announcing = false;
     this.speech.cancel();
     this.stopScheduledClicks();
   }
 
   resume({ runtime, blocks }) {
-    if (this.timer || this.transitionTimer || this.announcing || !this.context) {
+    if (this.timer || !this.context) {
       return false;
     }
     this.runtime = { ...runtime };
@@ -1241,42 +1245,17 @@ class MetronomeAudio {
     this.runtime = null;
   }
 
-  async beginPhase(sequence) {
+  async restart({ runtime, blocks }) {
+    this.stop();
+    return this.start({ runtime, blocks });
+  }
+
+  beginPhase(sequence) {
     if (!this.context || !this.runtime || sequence !== this.sequence) {
       return;
     }
 
     this.clearTimers();
-    if (this.runtime.phase === 'announce') {
-      const announcedRuntime = { ...this.runtime };
-      const block = getCurrentBlock(announcedRuntime, this.blocks);
-      const settings = this.getSpeechSettings();
-      this.onAnnounce(announcedRuntime, block);
-      this.speech.cancel();
-      this.announcing = true;
-      let speechResult = true;
-      if (settings.announceParts) {
-        speechResult = await this.speech.speak(block.name, {
-          voiceURI: settings.voiceURI,
-          volume: settings.volume,
-          rate: 1.08,
-          timeoutMs: 2200,
-          cancelPrevious: false
-        });
-      }
-      this.announcing = false;
-      if (!speechResult && settings.announceParts) {
-        this.onStatus('La voz no está disponible; continúo con cuenta visual.');
-      }
-      if (sequence !== this.sequence || !this.runtime) {
-        return;
-      }
-      this.runtime = advancePlaybackRuntime(this.runtime, this.blocks);
-      this.nextNoteTime = this.context.currentTime + 0.05;
-      this.startScheduler(sequence);
-      return;
-    }
-
     this.nextNoteTime = this.context.currentTime + 0.05;
     this.startScheduler(sequence);
   }
@@ -1299,50 +1278,46 @@ class MetronomeAudio {
     const browserWindow = getBrowserWindow();
     while (this.timer && this.nextNoteTime < this.context.currentTime + SCHEDULE_AHEAD_SECONDS) {
       const scheduledRuntime = { ...this.runtime };
-      if (scheduledRuntime.phase === 'announce') {
-        this.beginPhase(sequence);
-        break;
-      }
-
       const scheduledTime = this.nextNoteTime;
       const callbackDelay = Math.max(0, (scheduledTime - this.context.currentTime) * 1000);
       const accented = scheduledRuntime.phase === 'playing' && scheduledRuntime.beatInMeasure === 1;
       this.scheduleClick(scheduledTime, accented);
 
-      browserWindow.setTimeout(() => {
+      const callbackId = browserWindow.setTimeout(() => {
+        this.scheduledCallbacks.delete(callbackId);
         if (sequence !== this.sequence) {
           return;
         }
+        const announcementWord = getAnnouncementWord(scheduledRuntime, this.blocks);
         if (scheduledRuntime.phase === 'countIn') {
           this.onCountIn(scheduledRuntime);
-          const settings = this.getSpeechSettings();
-          if (settings.announceParts) {
-            const word = COUNT_WORDS.get(scheduledRuntime.countInBeat) || String(scheduledRuntime.countInBeat);
-            this.speech.speak(word, {
-              voiceURI: settings.voiceURI,
-              volume: settings.volume,
-              rate: 1.45,
-              timeoutMs: 700,
-              cancelPrevious: true
-            });
-          }
         } else {
           this.onBeat(scheduledRuntime);
         }
+        this.speakScheduledWord(announcementWord);
       }, callbackDelay);
+      this.scheduledCallbacks.add(callbackId);
 
       this.runtime = advancePlaybackRuntime(this.runtime, this.blocks);
       this.nextNoteTime += 60 / scheduledRuntime.bpm;
-
-      if (this.runtime.phase === 'announce') {
-        this.clearScheduler();
-        this.transitionTimer = browserWindow.setTimeout(() => {
-          this.transitionTimer = null;
-          this.beginPhase(sequence);
-        }, callbackDelay + 80);
-        break;
-      }
     }
+  }
+
+  speakScheduledWord(word) {
+    const settings = this.getSpeechSettings();
+    if (!word || !settings.announceParts) {
+      return;
+    }
+
+    this.speech.speak(word, {
+      voiceURI: settings.voiceURI,
+      volume: settings.volume,
+      rate: word.length > 12 ? 1.25 : 1.45,
+      timeoutMs: 650,
+      cancelPrevious: true
+    }).catch(() => {
+      this.onStatus('La voz no está disponible; continúo con clicks y cuenta visual.');
+    });
   }
 
   scheduleClick(time, accented) {
@@ -1369,10 +1344,11 @@ class MetronomeAudio {
 
   clearTimers() {
     this.clearScheduler();
-    if (this.transitionTimer) {
-      getBrowserWindow().clearTimeout(this.transitionTimer);
-      this.transitionTimer = null;
+    const browserWindow = getBrowserWindow();
+    for (const callbackId of this.scheduledCallbacks) {
+      browserWindow.clearTimeout(callbackId);
     }
+    this.scheduledCallbacks.clear();
   }
 
   stopScheduledClicks() {
@@ -1485,6 +1461,7 @@ function collectDom(root) {
     start: root.querySelector('#metronome-start'),
     pause: root.querySelector('#metronome-pause'),
     stop: root.querySelector('#metronome-stop'),
+    restart: root.querySelector('#metronome-restart'),
     tap: root.querySelector('#metronome-tap'),
     volume: root.querySelector('#metronome-volume'),
     status: root.querySelector('#metronome-status'),

@@ -3,6 +3,7 @@ export const MAX_BPM = 300;
 export const MIN_MEASURES = 1;
 export const MAX_MEASURES = 999;
 export const BEATS_PER_MEASURE = 4;
+export const INITIAL_COUNT_IN_BEATS = 4;
 export const MAX_PARTS = 32;
 export const SONG_SCHEMA_VERSION = 2;
 export const PREVIOUS_SONG_SCHEMA_VERSION = 1;
@@ -359,19 +360,6 @@ export function createRuntime(blocks) {
   };
 }
 
-export function createAnnouncementRuntime(blockIndex, blocks) {
-  const normalized = normalizeBlocks(blocks);
-  const safeBlockIndex = clampBlockIndex(blockIndex, normalized);
-  return {
-    blockIndex: safeBlockIndex,
-    measureInBlock: 1,
-    beatInMeasure: 1,
-    bpm: normalized[safeBlockIndex].bpm,
-    phase: 'announce',
-    countInBeat: null
-  };
-}
-
 export function createCountInRuntime(blockIndex, blocks) {
   const normalized = normalizeBlocks(blocks);
   const safeBlockIndex = clampBlockIndex(blockIndex, normalized);
@@ -381,12 +369,12 @@ export function createCountInRuntime(blockIndex, blocks) {
     beatInMeasure: 1,
     bpm: normalized[safeBlockIndex].bpm,
     phase: 'countIn',
-    countInBeat: 3
+    countInBeat: INITIAL_COUNT_IN_BEATS
   };
 }
 
 export function createPlaybackRuntime(blocks) {
-  return createAnnouncementRuntime(0, blocks);
+  return createCountInRuntime(0, blocks);
 }
 
 export function advanceRuntime(runtime, blocks) {
@@ -419,10 +407,6 @@ export function advanceRuntime(runtime, blocks) {
 export function advancePlaybackRuntime(runtime, blocks) {
   const normalized = normalizeBlocks(blocks);
 
-  if (runtime.phase === 'announce') {
-    return createCountInRuntime(runtime.blockIndex, normalized);
-  }
-
   if (runtime.phase === 'countIn') {
     if (runtime.countInBeat > 1) {
       return {
@@ -440,16 +424,7 @@ export function advancePlaybackRuntime(runtime, blocks) {
     };
   }
 
-  const next = advanceRuntime(runtime, normalized);
-  if (next.blockIndex !== runtime.blockIndex && next.beatInMeasure === 1 && next.measureInBlock === 1) {
-    return createAnnouncementRuntime(next.blockIndex, normalized);
-  }
-
-  return {
-    ...next,
-    phase: 'playing',
-    countInBeat: null
-  };
+  return advanceRuntime(runtime, normalized);
 }
 
 export function getCurrentBlock(runtime, blocks) {
@@ -460,6 +435,27 @@ export function getCurrentBlock(runtime, blocks) {
 export function getNextBlock(runtime, blocks) {
   const normalized = normalizeBlocks(blocks);
   return normalized[(runtime.blockIndex + 1) % normalized.length] || normalized[0];
+}
+
+export function getAnnouncementWord(runtime, blocks) {
+  const normalized = normalizeBlocks(blocks);
+  const currentBlock = getCurrentBlock(runtime, normalized);
+
+  if (runtime.phase === 'countIn') {
+    if (runtime.countInBeat === INITIAL_COUNT_IN_BEATS) {
+      return currentBlock.name;
+    }
+    return countInWord(runtime.countInBeat);
+  }
+
+  if (runtime.phase !== 'playing' || runtime.measureInBlock !== currentBlock.measures) {
+    return null;
+  }
+
+  if (runtime.beatInMeasure === 1) {
+    return getNextBlock(runtime, normalized).name;
+  }
+  return countInWord(BEATS_PER_MEASURE - runtime.beatInMeasure + 1);
 }
 
 export function selectPreferredVoice(voices = [], preferredVoiceURI = '') {
@@ -569,6 +565,13 @@ export function createSongPlaybackMachine(blocks) {
       paused = false;
       schedulerActive = false;
       runtime = createPlaybackRuntime(normalized);
+    },
+    restart() {
+      running = true;
+      paused = false;
+      schedulerActive = true;
+      runtime = createPlaybackRuntime(normalized);
+      return true;
     },
     tick() {
       runtime = advancePlaybackRuntime(runtime, normalized);
@@ -682,6 +685,19 @@ function stableId(value, fallback) {
 
 function clampBlockIndex(blockIndex, blocks) {
   return Number.isInteger(blockIndex) && blockIndex >= 0 && blockIndex < blocks.length ? blockIndex : 0;
+}
+
+function countInWord(value) {
+  if (value === 3) {
+    return 'Tres';
+  }
+  if (value === 2) {
+    return 'Dos';
+  }
+  if (value === 1) {
+    return 'Uno';
+  }
+  return null;
 }
 
 function cloneDefaultBlocks() {
