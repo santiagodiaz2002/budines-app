@@ -39,7 +39,7 @@ Cambiar de pestaña no recarga la página. Budines conserva autenticación, D1, 
 - Deshacer revierte el último cambio.
 - Nueva partida requiere confirmación en modal.
 - Puntajes e historial se guardan en `localStorage`; datos corruptos se descartan.
-- Cada punto se representa con una instancia decorativa de `public/media/joint.jpg`, generada desde el archivo fuente `Joint.jpg` de 630x360 px. Los bloques de cinco usan cuatro imágenes verticales y una diagonal.
+- Cada punto se representa con una instancia decorativa del modelo visual elegido: `public/media/joint-clean.png` o `public/media/smoke.png`. Los bloques de cinco usan cuatro imágenes verticales y una diagonal.
 
 ### Metrónomo
 
@@ -368,7 +368,7 @@ npx wrangler d1 export budines --local --output=budines-local-backup.sql
 12. Eliminar una venta excluye el importe del resumen.
 13. Eliminar un saldo inicial activo excluye el importe del resumen sin borrar la fila.
 14. La barra inferior muestra Budines, Truco, Metrónomo y Afinador.
-15. `public/media/joint.jpg`, módulos JS nuevos, manifest y service worker responden sin 404.
+15. `public/media/joint-clean.png`, `public/media/smoke.png`, módulos JS nuevos, manifest y service worker responden sin 404.
 16. La app se instala y abre en modo standalone en ambos iPhone.
 
 ## Información todavía no identificada

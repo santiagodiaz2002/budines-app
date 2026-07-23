@@ -22,7 +22,7 @@
 - Los registros anulados no cuentan en el resumen.
 - Ventas y saldos iniciales activos pueden eliminarse desde la interfaz mediante baja lógica confirmada.
 - Truco, Metrónomo y Afinador son herramientas exclusivamente locales del dispositivo y no usan D1.
-- Truco es un anotador argentino a 30 puntos para Nosotros y Ellos; representa puntos con instancias de `public/media/joint.jpg`.
+- Truco es un anotador argentino a 30 puntos para Nosotros y Ellos; representa puntos con el modelo visual local elegido entre `public/media/joint-clean.png` y `public/media/smoke.png`.
 - El metrónomo funciona en 4/4 con BPM manual, Tap Tempo, volumen, canciones guardadas localmente y hasta 32 partes nombradas/editables inline que se repiten hasta Stop.
 - El metrónomo usa Web Speech API local: al iniciar hay count-in inicial de cuatro pulsos, y entre partes el último compás real anuncia la próxima parte sin agregar pausas ni compases.
 - Las canciones y preferencias de voz del metrónomo viven solo en `localStorage` con esquema versionado y pueden migrarse a cuentas en el futuro, pero no usan D1 ni sincronización en esta versión.

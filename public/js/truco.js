@@ -1,4 +1,22 @@
 const STORAGE_KEY = 'budines.truco.v1';
+export const TRUCO_VISUAL_STORAGE_KEY = 'budines.truco.visual.v1';
+export const DEFAULT_TRUCO_VISUAL_MODEL = 'joint';
+export const TRUCO_VISUAL_MODELS = Object.freeze({
+  joint: Object.freeze({
+    id: 'joint',
+    label: 'Joint',
+    src: '/media/joint-clean.png',
+    width: 489,
+    height: 90
+  }),
+  smoke: Object.freeze({
+    id: 'smoke',
+    label: 'Smoke',
+    src: '/media/smoke.png',
+    width: 489,
+    height: 62
+  })
+});
 const TEAM_IDS = ['nosotros', 'ellos'];
 const DEFAULT_TEAMS = {
   nosotros: 'Nosotros',
@@ -6,10 +24,10 @@ const DEFAULT_TEAMS = {
 };
 const MAX_SCORE = 30;
 const MIN_SCORE = 0;
-const TALLY_SRC = '/media/smoke.png';
-const TALLY_WIDTH = 489;
-const TALLY_HEIGHT = 62;
 const BASE_STICK_POSITIONS = ['left', 'top', 'right', 'bottom'];
+const SWIPE_MIN_DISTANCE = 46;
+const SWIPE_MAX_VERTICAL = 42;
+const SWIPE_DOMINANCE = 1.55;
 
 export function createDefaultTrucoState() {
   return {
@@ -59,6 +77,10 @@ export function sanitizeTrucoState(value) {
     scores: normalizedScores,
     history: normalizedHistory
   };
+}
+
+export function sanitizeTrucoVisualModel(value) {
+  return Object.prototype.hasOwnProperty.call(TRUCO_VISUAL_MODELS, value) ? value : DEFAULT_TRUCO_VISUAL_MODEL;
 }
 
 export function applyScoreChange(state, team, delta) {
@@ -145,12 +167,18 @@ export function initTruco(root = document.querySelector('#truco-tool')) {
     winner: root.querySelector('#truco-winner'),
     undo: root.querySelector('#truco-undo'),
     reset: root.querySelector('#truco-reset'),
+    visualButtons: [...root.querySelectorAll('[data-truco-visual]')],
+    board: root.querySelector('[data-truco-board]'),
     dialog: document.querySelector('#truco-reset-dialog'),
     resetCancel: document.querySelector('#truco-reset-cancel'),
     resetConfirm: document.querySelector('#truco-reset-confirm')
   };
 
   let state = readState();
+  let visualModel = readVisualModel();
+  let swipeStart = null;
+
+  preloadTallyAssets();
 
   root.addEventListener('click', (event) => {
     const scoreButton = event.target.closest('[data-truco-action]');
@@ -164,6 +192,17 @@ export function initTruco(root = document.querySelector('#truco-tool')) {
     persistState(state);
     render();
   });
+
+  for (const button of dom.visualButtons) {
+    button.addEventListener('click', () => {
+      setVisualModel(button.dataset.trucoVisual);
+    });
+  }
+
+  dom.board?.addEventListener('pointerdown', handleSwipeStart);
+  dom.board?.addEventListener('pointermove', handleSwipeMove);
+  dom.board?.addEventListener('pointerup', handleSwipeEnd);
+  dom.board?.addEventListener('pointercancel', clearSwipe);
 
   dom.undo?.addEventListener('click', () => {
     state = undoScoreChange(state);
@@ -203,7 +242,74 @@ export function initTruco(root = document.querySelector('#truco-tool')) {
     dom.reset?.focus();
   }
 
+  function setVisualModel(value) {
+    const nextModel = sanitizeTrucoVisualModel(value);
+    if (visualModel === nextModel) {
+      renderVisualControls();
+      return;
+    }
+
+    visualModel = nextModel;
+    persistVisualModel(visualModel);
+    render();
+  }
+
+  function handleSwipeStart(event) {
+    if (event.isPrimary === false || isSwipeIgnoredTarget(event.target)) {
+      swipeStart = null;
+      return;
+    }
+
+    swipeStart = {
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      vertical: false
+    };
+  }
+
+  function handleSwipeMove(event) {
+    if (!isSameSwipe(event)) {
+      return;
+    }
+
+    const dx = event.clientX - swipeStart.x;
+    const dy = event.clientY - swipeStart.y;
+    if (Math.abs(dy) > 18 && Math.abs(dy) > Math.abs(dx)) {
+      swipeStart.vertical = true;
+    }
+  }
+
+  function handleSwipeEnd(event) {
+    if (!isSameSwipe(event)) {
+      clearSwipe();
+      return;
+    }
+
+    const dx = event.clientX - swipeStart.x;
+    const dy = event.clientY - swipeStart.y;
+    const isHorizontal =
+      Math.abs(dx) >= SWIPE_MIN_DISTANCE &&
+      Math.abs(dy) <= SWIPE_MAX_VERTICAL &&
+      Math.abs(dx) > Math.abs(dy) * SWIPE_DOMINANCE;
+
+    if (!swipeStart.vertical && isHorizontal) {
+      setVisualModel(dx < 0 ? 'smoke' : 'joint');
+    }
+    clearSwipe();
+  }
+
+  function isSameSwipe(event) {
+    return Boolean(swipeStart && (swipeStart.pointerId == null || event.pointerId === swipeStart.pointerId));
+  }
+
+  function clearSwipe() {
+    swipeStart = null;
+  }
+
   function render() {
+    renderVisualControls();
+
     for (const team of TEAM_IDS) {
       const teamRoot = dom.teams.get(team);
       if (!teamRoot) {
@@ -227,7 +333,7 @@ export function initTruco(root = document.querySelector('#truco-tool')) {
       for (const groupRoot of teamRoot.querySelectorAll('[data-truco-group]')) {
         const groupIndex = Number(groupRoot.dataset.trucoGroup);
         const group = groups[groupIndex] || { vertical: 0, diagonal: false };
-        groupRoot.replaceChildren(...createStickNodes(group));
+        groupRoot.replaceChildren(...createStickNodes(group, visualModel));
         groupRoot.setAttribute(
           'aria-label',
           `${DEFAULT_TEAMS[team]} puntos ${groupIndex * 5 + 1} a ${groupIndex * 5 + 5}: ${groupPoints(group)}`
@@ -245,10 +351,20 @@ export function initTruco(root = document.querySelector('#truco-tool')) {
     }
   }
 
+  function renderVisualControls() {
+    root.dataset.trucoVisualModel = visualModel;
+    for (const button of dom.visualButtons) {
+      const pressed = button.dataset.trucoVisual === visualModel;
+      button.setAttribute('aria-pressed', pressed ? 'true' : 'false');
+    }
+  }
+
   render();
 
   return {
     getState: () => structuredClone(state),
+    getVisualModel: () => visualModel,
+    setVisualModel,
     reset() {
       state = resetTrucoState();
       persistState(state);
@@ -257,7 +373,8 @@ export function initTruco(root = document.querySelector('#truco-tool')) {
   };
 }
 
-function createStickNodes(group) {
+function createStickNodes(group, visualModel = DEFAULT_TRUCO_VISUAL_MODEL) {
+  const model = TRUCO_VISUAL_MODELS[sanitizeTrucoVisualModel(visualModel)];
   const nodes = [];
 
   for (let index = 0; index < group.vertical; index += 1) {
@@ -266,12 +383,13 @@ function createStickNodes(group) {
     img.className = `stick-img stick-img--base stick-img--${position}`;
     img.dataset.stick = 'base';
     img.dataset.stickPosition = position;
-    img.src = TALLY_SRC;
-    img.width = TALLY_WIDTH;
-    img.height = TALLY_HEIGHT;
+    img.dataset.trucoVisualModel = model.id;
+    img.src = model.src;
+    img.width = model.width;
+    img.height = model.height;
     img.alt = '';
     img.decoding = 'async';
-    img.loading = 'lazy';
+    img.loading = 'eager';
     nodes.push(img);
   }
 
@@ -279,12 +397,13 @@ function createStickNodes(group) {
     const img = document.createElement('img');
     img.className = 'stick-img stick-img--diagonal';
     img.dataset.stick = 'diagonal';
-    img.src = TALLY_SRC;
-    img.width = TALLY_WIDTH;
-    img.height = TALLY_HEIGHT;
+    img.dataset.trucoVisualModel = model.id;
+    img.src = model.src;
+    img.width = model.width;
+    img.height = model.height;
     img.alt = '';
     img.decoding = 'async';
-    img.loading = 'lazy';
+    img.loading = 'eager';
     nodes.push(img);
   }
 
@@ -303,8 +422,37 @@ function readState() {
   }
 }
 
+function readVisualModel() {
+  try {
+    return sanitizeTrucoVisualModel(getStorage()?.getItem(TRUCO_VISUAL_STORAGE_KEY));
+  } catch {
+    return DEFAULT_TRUCO_VISUAL_MODEL;
+  }
+}
+
 function persistState(state) {
   getStorage()?.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function persistVisualModel(value) {
+  getStorage()?.setItem(TRUCO_VISUAL_STORAGE_KEY, sanitizeTrucoVisualModel(value));
+}
+
+function preloadTallyAssets() {
+  const ImageClass = globalThis.Image || globalThis.window?.Image;
+  if (!ImageClass) {
+    return;
+  }
+
+  for (const model of Object.values(TRUCO_VISUAL_MODELS)) {
+    const image = new ImageClass();
+    image.decoding = 'async';
+    image.src = model.src;
+  }
+}
+
+function isSwipeIgnoredTarget(target) {
+  return Boolean(target?.closest?.('button, a, input, textarea, select, [role="button"], [data-truco-no-swipe]'));
 }
 
 function isValidScores(value) {

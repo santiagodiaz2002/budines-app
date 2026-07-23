@@ -11,12 +11,13 @@
     <meta name="color-scheme" content="dark light">
     <title>Budines</title>
     <link rel="preload" href="/branding/logo-luz-en-ruinas.png" as="image">
+    <link rel="preload" href="/media/joint-clean.png" as="image">
     <link rel="preload" href="/media/smoke.png" as="image">
     <link rel="manifest" href="/manifest.webmanifest">
     <link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
     <link rel="icon" href="/icons/favicon-16.png" sizes="16x16" type="image/png">
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
-    <link rel="stylesheet" href="/styles.css?v=metronome-continuous-20260716">
+    <link rel="stylesheet" href="/styles.css?v=truco-visual-selector-20260723">
   </head>
   <body>
     <div class="boot-brand" aria-hidden="true">
@@ -148,9 +149,13 @@
         <section id="truco-tool" class="tool-panel" data-tool-panel="truco" role="tabpanel" aria-labelledby="tab-truco" hidden>
           <section class="truco-shell" aria-labelledby="truco-title">
             <header class="truco-header">
-              <div>
+              <div class="truco-heading">
                 <p class="eyebrow">Marcador</p>
                 <h2 id="truco-title">Truco</h2>
+              </div>
+              <div class="truco-visual-toggle" role="group" aria-label="Modelo visual de puntos">
+                <button class="truco-visual-option" type="button" data-truco-visual="joint" aria-pressed="true">Joint</button>
+                <button class="truco-visual-option" type="button" data-truco-visual="smoke" aria-pressed="false">Smoke</button>
               </div>
               <div class="truco-actions">
                 <button id="truco-undo" class="quiet-button" type="button">Deshacer</button>
@@ -496,6 +501,6 @@
     </div>
 
     <p id="live-region" class="sr-only" aria-live="polite" aria-atomic="true"></p>
-    <script type="module" src="/js/app.js?v=metronome-continuous-20260716"></script>
+    <script type="module" src="/js/app.js?v=truco-visual-selector-20260723"></script>
   </body>
 </html>
