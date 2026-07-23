@@ -302,6 +302,49 @@ body[data-auth-state="booting"] .shell {
   border-color: var(--danger);
 }
 
+.quantity-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.quantity-unit-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-width: 104px;
+  min-height: 48px;
+  border: 1px solid #c9bca7;
+  border-radius: 8px;
+  background: #fffaf2;
+  overflow: hidden;
+}
+
+.quantity-unit-button {
+  min-width: 52px;
+  min-height: 46px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.quantity-unit-button + .quantity-unit-button {
+  border-left: 1px solid #d8cbb9;
+}
+
+.quantity-unit-button.is-active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.quantity-unit-button:focus-visible {
+  position: relative;
+  z-index: 1;
+  outline-offset: -3px;
+}
+
 .primary-button,
 .secondary-button,
 .danger-button,
@@ -1465,6 +1508,10 @@ body[data-active-tool="truco"] #truco-tool {
 }
 
 @media (max-width: 560px) {
+  .quantity-control {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
   .metronome-block-row {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
