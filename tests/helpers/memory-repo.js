@@ -84,6 +84,7 @@ export function defaultRecords() {
       userId: null,
       userDisplayName: null,
       grams: null,
+      quantityUnit: 'GR',
       amountArs: 3000,
       status: 'activo',
       commercialDate: null,
@@ -105,6 +106,7 @@ export function defaultRecords() {
       userId: null,
       userDisplayName: null,
       grams: null,
+      quantityUnit: 'GR',
       amountArs: 62000,
       status: 'activo',
       commercialDate: null,
@@ -130,6 +132,7 @@ export function saleRecord(overrides = {}) {
     userId: 'santi',
     userDisplayName: 'Santi',
     grams: 10,
+    quantityUnit: 'GR',
     amountArs: 1000,
     status: 'activo',
     commercialDate: '2026-07-12',
@@ -159,5 +162,9 @@ function assertSaleRecord(record) {
 
   if (!Number.isSafeInteger(record.grams) || record.grams < 1) {
     throw new ApiError(400, 'missing_grams', 'La venta debe tener gramos.');
+  }
+
+  if (record.quantityUnit !== 'GR' && record.quantityUnit !== 'AP') {
+    throw new ApiError(400, 'invalid_quantity_unit', 'La unidad debe ser GR o AP.');
   }
 }

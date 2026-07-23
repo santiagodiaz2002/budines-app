@@ -3,16 +3,22 @@ import { formatArs, formatCommercialDate } from '../public/js/format.js';
 import { validateSaleFields } from '../public/js/validation.js';
 
 describe('lógica frontend compartida', () => {
-  it('normaliza importes y gramos como texto entero', () => {
-    expect(validateSaleFields('25', '62000')).toEqual({
+  it('normaliza importes y cantidad como texto entero con unidad', () => {
+    expect(validateSaleFields('25', 'GR', '62000')).toEqual({
       ok: true,
       grams: 25,
+      quantityUnit: 'GR',
       amountArs: 62000
     });
 
-    expect(validateSaleFields('25', '1,5')).toMatchObject({
+    expect(validateSaleFields('25', 'AP', '1,5')).toMatchObject({
       ok: false,
       field: 'amount'
+    });
+
+    expect(validateSaleFields('25', 'KG', '62000')).toMatchObject({
+      ok: false,
+      field: 'quantityUnit'
     });
   });
 

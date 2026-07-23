@@ -7,7 +7,7 @@ import {
   login,
   logout,
   registerAccount
-} from './api.js?v=auth-20260723';
+} from './api.js?v=quantity-20260723';
 import {
   formatArs,
   formatCommercialDate,
@@ -21,7 +21,7 @@ import { initToolNavigation } from './navigation.js';
 import { initTruco } from './truco.js?v=auth-20260723';
 import { initTuner } from './tuner.js';
 import { clearLocalStorageUser, setLocalStorageUser } from './local-storage.js?v=auth-20260723';
-import { parsePositiveIntegerText, validateSaleFields } from './validation.js';
+import { parsePositiveIntegerText, validateSaleFields } from './validation.js?v=quantity-20260723';
 
 const AUTH_MODES = Object.freeze({
   login: {
@@ -66,6 +66,7 @@ const dom = {
   recordsSection: document.querySelector('#records-section'),
   saleForm: document.querySelector('#sale-form'),
   gramsInput: document.querySelector('#grams-input'),
+  quantityUnitButtons: [...document.querySelectorAll('[data-quantity-unit]')],
   amountInput: document.querySelector('#amount-input'),
   amountPreview: document.querySelector('#amount-preview'),
   saleSubmit: document.querySelector('#sale-submit'),
@@ -92,6 +93,7 @@ const state = {
   isSubmittingSale: false,
   saleIdempotencyKey: null,
   lastSalePayload: null,
+  quantityUnit: 'GR',
   recordsOffset: 0,
   recordsLimit: 30,
   hasMoreRecords: false,
@@ -131,6 +133,9 @@ function bindEvents() {
   dom.saleForm.addEventListener('submit', handleSaleSubmit);
   dom.amountInput.addEventListener('input', handleAmountInput);
   dom.gramsInput.addEventListener('input', handleSaleInputChange);
+  for (const button of dom.quantityUnitButtons) {
+    button.addEventListener('click', () => setQuantityUnit(button.dataset.quantityUnit));
+  }
   dom.amountInput.addEventListener('input', handleSaleInputChange);
   dom.showEntry.addEventListener('click', () => switchView('entry'));
   dom.showRecords.addEventListener('click', () => switchView('records'));
@@ -197,7 +202,7 @@ async function handleSaleSubmit(event) {
 
   const gramsRaw = dom.gramsInput.value;
   const amountRaw = dom.amountInput.value;
-  const validation = validateSaleFields(gramsRaw, amountRaw);
+  const validation = validateSaleFields(gramsRaw, state.quantityUnit, amountRaw);
   if (!validation.ok) {
     showSaleError(validation.message, validation.field);
     return;
@@ -205,6 +210,7 @@ async function handleSaleSubmit(event) {
 
   const payload = {
     grams: gramsRaw,
+    quantityUnit: state.quantityUnit,
     amountArs: amountRaw
   };
 
@@ -222,6 +228,7 @@ async function handleSaleSubmit(event) {
 
     dom.gramsInput.value = '';
     dom.amountInput.value = '';
+    setQuantityUnit('GR');
     dom.amountPreview.textContent = '';
     state.saleIdempotencyKey = null;
     state.lastSalePayload = null;
@@ -251,6 +258,7 @@ function handleSaleInputChange() {
 
   const unchanged =
     state.lastSalePayload.grams === dom.gramsInput.value &&
+    state.lastSalePayload.quantityUnit === state.quantityUnit &&
     state.lastSalePayload.amountArs === dom.amountInput.value;
 
   if (!unchanged) {
@@ -445,7 +453,7 @@ function createRecordCard(record) {
   details.append(
     detailItem('Tipo', formatRecordType(record.type)),
     detailItem('Usuario', record.user?.displayName || 'Saldo inicial'),
-    detailItem('Gramos', record.grams === null ? 'Sin informar' : `${formatInteger(record.grams)} g`),
+    detailItem('Cantidad', formatQuantity(record)),
     detailItem('Fecha', formatCommercialDate(record.commercialDate))
   );
 
@@ -471,7 +479,7 @@ function openDeleteDialog(record) {
     detailItem('Importe', formatArs(record.amountArs)),
     detailItem('Tipo', formatRecordType(record.type)),
     detailItem('Usuario', record.user?.displayName || 'Saldo inicial'),
-    detailItem('Gramos', record.grams === null ? 'Sin informar' : `${formatInteger(record.grams)} g`),
+    detailItem('Cantidad', formatQuantity(record)),
     detailItem('Fecha', formatCommercialDate(record.commercialDate)),
     detailItem('Estado', formatRecordStatus(record.status))
   );
@@ -647,6 +655,7 @@ function clearBudinesData() {
   dom.amountPreview.textContent = '';
   dom.gramsInput.value = '';
   dom.amountInput.value = '';
+  setQuantityUnit('GR');
   state.saleIdempotencyKey = null;
   state.lastSalePayload = null;
   state.recordPendingDelete = null;
@@ -656,9 +665,27 @@ function showSaleError(message, field) {
   dom.saleError.textContent = message;
   dom.gramsInput.setAttribute('aria-invalid', field === 'grams' ? 'true' : 'false');
   dom.amountInput.setAttribute('aria-invalid', field === 'amount' ? 'true' : 'false');
-  const target = field === 'grams' ? dom.gramsInput : dom.amountInput;
+  const target = field === 'amount' ? dom.amountInput : dom.gramsInput;
   target.focus();
   announce(message);
+}
+
+function setQuantityUnit(unit) {
+  if (unit !== 'GR' && unit !== 'AP') {
+    return;
+  }
+
+  const changed = state.quantityUnit !== unit;
+  state.quantityUnit = unit;
+  for (const button of dom.quantityUnitButtons) {
+    const active = button.dataset.quantityUnit === unit;
+    button.classList.toggle('is-active', active);
+    button.setAttribute('aria-pressed', active ? 'true' : 'false');
+  }
+
+  if (changed) {
+    handleSaleInputChange();
+  }
 }
 
 function setAuthMode(mode) {
@@ -698,6 +725,9 @@ function setSaleBusy(isBusy) {
   dom.saleSubmit.disabled = isBusy;
   dom.gramsInput.disabled = isBusy;
   dom.amountInput.disabled = isBusy;
+  for (const button of dom.quantityUnitButtons) {
+    button.disabled = isBusy;
+  }
   dom.saleSubmit.textContent = isBusy ? 'Guardando...' : 'Registrar';
   if (!isBusy) {
     dom.gramsInput.removeAttribute('aria-invalid');
@@ -715,6 +745,15 @@ function togglePasswordVisibility() {
 
 function canAccessBudines() {
   return Boolean(state.user?.capabilities?.canAccessBudines);
+}
+
+function formatQuantity(record) {
+  if (record.grams === null || record.grams === undefined) {
+    return 'Sin informar';
+  }
+
+  const unit = record.quantityUnit === 'AP' ? 'AP' : 'GR';
+  return `${formatInteger(record.grams)} ${unit}`;
 }
 
 function stopLocalAudio() {

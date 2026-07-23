@@ -8,6 +8,7 @@ let windowRef;
 let records;
 let summary;
 let deleteCalls;
+let createCalls;
 let deleteShouldFail;
 
 beforeEach(async () => {
@@ -34,6 +35,7 @@ beforeEach(async () => {
     profitArs: 0
   };
   deleteCalls = [];
+  createCalls = [];
   deleteShouldFail = false;
 
   windowRef = new Window({
@@ -53,8 +55,12 @@ beforeEach(async () => {
   vi.stubGlobal('Event', windowRef.Event);
   vi.stubGlobal('KeyboardEvent', windowRef.KeyboardEvent);
   vi.stubGlobal('MouseEvent', windowRef.MouseEvent);
+  let uuidCounter = 0;
   vi.stubGlobal('crypto', {
-    randomUUID: vi.fn(() => 'test-uuid')
+    randomUUID: vi.fn(() => {
+      uuidCounter += 1;
+      return `test-uuid-${uuidCounter}`;
+    })
   });
   vi.stubGlobal('fetch', vi.fn(handleFetch));
 
@@ -69,6 +75,86 @@ afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   windowRef?.close();
+});
+
+describe('interfaz de carga de Budines', () => {
+  it('usa GR como unidad inicial y permite guardar GR', async () => {
+    document.querySelector('#show-entry').click();
+
+    expect(document.querySelector('#quantity-unit-gr').getAttribute('aria-pressed')).toBe('true');
+    expect(document.querySelector('#quantity-unit-ap').getAttribute('aria-pressed')).toBe('false');
+
+    document.querySelector('#grams-input').value = '350';
+    document.querySelector('#amount-input').value = '7000';
+    document.querySelector('#sale-form').dispatchEvent(new windowRef.Event('submit', { bubbles: true, cancelable: true }));
+
+    await waitFor(() => createCalls.length === 1);
+
+    expect(createCalls[0]).toMatchObject({
+      grams: '350',
+      quantityUnit: 'GR',
+      amountArs: '7000'
+    });
+    expect(summary.totalArs).toBe(10000);
+
+    document.querySelector('#show-records').click();
+    await waitFor(() => document.querySelector('#records-list').textContent.includes('350 GR'));
+    expect(document.querySelector('#records-list').textContent).toContain('350 GR');
+  });
+
+  it('cambia a AP, guarda AP y vuelve el selector a GR', async () => {
+    document.querySelector('#show-entry').click();
+    document.querySelector('#quantity-unit-ap').click();
+
+    expect(document.querySelector('#quantity-unit-gr').getAttribute('aria-pressed')).toBe('false');
+    expect(document.querySelector('#quantity-unit-ap').getAttribute('aria-pressed')).toBe('true');
+
+    document.querySelector('#grams-input').value = '12';
+    document.querySelector('#amount-input').value = '5000';
+    document.querySelector('#sale-form').dispatchEvent(new windowRef.Event('submit', { bubbles: true, cancelable: true }));
+
+    await waitFor(() => createCalls.length === 1);
+
+    expect(createCalls[0]).toMatchObject({
+      grams: '12',
+      quantityUnit: 'AP',
+      amountArs: '5000'
+    });
+    await waitFor(() => document.querySelector('#quantity-unit-gr').getAttribute('aria-pressed') === 'true');
+    expect(document.querySelector('#quantity-unit-gr').getAttribute('aria-pressed')).toBe('true');
+    expect(summary.totalArs).toBe(8000);
+
+    document.querySelector('#show-records').click();
+    await waitFor(() => document.querySelector('#records-list').textContent.includes('12 AP'));
+    expect(document.querySelector('#records-list').textContent).toContain('12 AP');
+  });
+
+  it('muestra registros antiguos sin unidad como GR', async () => {
+    records = [
+      {
+        id: 'venta-vieja-sin-unidad',
+        type: 'venta',
+        status: 'activo',
+        grams: 350,
+        amountArs: 7000,
+        user: {
+          id: 'santi',
+          displayName: 'Santi'
+        },
+        commercialDate: '2026-07-23',
+        createdAt: '2026-07-23T15:00:00.000Z',
+        voidedAt: null,
+        voidedBy: null
+      }
+    ];
+
+    document.querySelector('#reload-records').click();
+
+    await waitFor(() => document.querySelector('#records-list').textContent.includes('350 GR'));
+    expect(document.querySelector('#records-list').textContent).toContain('350 GR');
+    expect(document.querySelector('#records-list').textContent).not.toContain('gramos');
+    expect(document.querySelector('#records-list').textContent).not.toContain('tiros');
+  });
 });
 
 describe('interfaz de eliminacion de registros', () => {
@@ -174,6 +260,43 @@ async function handleFetch(input, options = {}) {
         nextOffset: null
       }
     });
+  }
+
+  if (url.pathname === '/api/records' && method === 'POST') {
+    const body = JSON.parse(options.body);
+    createCalls.push(body);
+
+    const record = {
+      id: body.idempotencyKey,
+      type: 'venta',
+      status: 'activo',
+      grams: Number(body.grams),
+      quantityUnit: body.quantityUnit ?? 'GR',
+      amountArs: Number(body.amountArs),
+      user: {
+        id: 'santi',
+        displayName: 'Santi'
+      },
+      commercialDate: '2026-07-23',
+      createdAt: '2026-07-23T15:00:00.000Z',
+      voidedAt: null,
+      voidedBy: null
+    };
+    records = [record, ...records];
+    summary = {
+      ...summary,
+      totalArs: summary.totalArs + record.amountArs,
+      missingArs: Math.max(0, summary.missingArs - record.amountArs)
+    };
+
+    return json(
+      {
+        ok: true,
+        result: 'created',
+        record
+      },
+      201
+    );
   }
 
   if (url.pathname === '/api/records/saldo-inicial-ars-3000/void' && method === 'POST') {

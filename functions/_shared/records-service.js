@@ -1,15 +1,16 @@
 import { ApiError } from './http.js';
 import { argentinaBusinessDate, nowIso } from './dates.js';
-import { parsePositiveIntegerText, validateIdempotencyKey } from './validation.js';
+import { parsePositiveIntegerText, parseQuantityUnit, validateIdempotencyKey } from './validation.js';
 
 export async function createSale(repo, input, user, date = new Date()) {
-  const grams = parsePositiveIntegerText(input?.grams, 'Gramos');
+  const grams = parsePositiveIntegerText(input?.grams, 'Cantidad');
+  const quantityUnit = parseQuantityUnit(input?.quantityUnit ?? 'GR');
   const amountArs = parsePositiveIntegerText(input?.amountArs, 'Importe total');
   const idempotencyKey = validateIdempotencyKey(input?.idempotencyKey);
 
   const existing = await repo.findRecordByIdempotencyKey(idempotencyKey);
   if (existing) {
-    assertSameSale(existing, { userId: user.id, grams, amountArs });
+    assertSameSale(existing, { userId: user.id, grams, quantityUnit, amountArs });
     return { kind: 'existing', record: existing };
   }
 
@@ -18,6 +19,7 @@ export async function createSale(repo, input, user, date = new Date()) {
     type: 'venta',
     userId: user.id,
     grams,
+    quantityUnit,
     amountArs,
     status: 'activo',
     commercialDate: argentinaBusinessDate(date),
@@ -41,7 +43,7 @@ export async function createSale(repo, input, user, date = new Date()) {
       throw error;
     }
 
-    assertSameSale(duplicate, { userId: user.id, grams, amountArs });
+    assertSameSale(duplicate, { userId: user.id, grams, quantityUnit, amountArs });
     return { kind: 'existing', record: duplicate };
   }
 }
@@ -77,6 +79,7 @@ function assertSameSale(record, expected) {
     record.type === 'venta' &&
     record.userId === expected.userId &&
     record.grams === expected.grams &&
+    (record.quantityUnit || 'GR') === expected.quantityUnit &&
     record.amountArs === expected.amountArs;
 
   if (!same) {

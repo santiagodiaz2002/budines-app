@@ -26,6 +26,7 @@ describe('registros, idempotencia y eliminacion logica', () => {
     expect(summary.totalArs).toBe(4000);
     expect(listed.map((record) => record.id)).toEqual(['saldo-inicial-ars-3000', 'venta-activa']);
     expect(repo.records.find((record) => record.id === 'saldo-inicial-ars-3000').grams).toBeNull();
+    expect(repo.records.find((record) => record.id === 'saldo-inicial-ars-3000').quantityUnit).toBe('GR');
   });
 
   it('primera peticion inserta, repeticion no duplica y nueva clave crea otra venta', async () => {
@@ -51,7 +52,31 @@ describe('registros, idempotencia y eliminacion logica', () => {
     expect(first.kind).toBe('created');
     expect(repeated.kind).toBe('existing');
     expect(second.kind).toBe('created');
+    expect(first.record.quantityUnit).toBe('GR');
     expect(repo.records.filter((record) => record.type === 'venta')).toHaveLength(2);
+  });
+
+  it('guarda unidad AP y GR sin cambiar totales economicos', async () => {
+    const repo = createMemoryRepo();
+
+    const gr = await createSale(repo, {
+      grams: '350',
+      quantityUnit: 'GR',
+      amountArs: '7000',
+      idempotencyKey: 'idem-key-unit-gr'
+    }, user);
+    const ap = await createSale(repo, {
+      grams: '12',
+      quantityUnit: 'AP',
+      amountArs: '5000',
+      idempotencyKey: 'idem-key-unit-ap'
+    }, user);
+    const summary = await getSummary(repo);
+
+    expect(gr.record).toMatchObject({ grams: 350, quantityUnit: 'GR', amountArs: 7000 });
+    expect(ap.record).toMatchObject({ grams: 12, quantityUnit: 'AP', amountArs: 5000 });
+    expect(summary.totalArs).toBe(15000);
+    expect(summary.missingArs).toBe(105000);
   });
 
   it('la misma clave con otra operacion produce conflicto', async () => {
@@ -67,6 +92,7 @@ describe('registros, idempotencia y eliminacion logica', () => {
     await expect(
       createSale(repo, {
         ...input,
+        quantityUnit: 'AP',
         amountArs: '62000'
       }, user)
     ).rejects.toMatchObject({
@@ -86,6 +112,17 @@ describe('registros, idempotencia y eliminacion logica', () => {
       }, user)
     ).rejects.toMatchObject({
       code: 'required_field'
+    });
+
+    await expect(
+      createSale(repo, {
+        grams: '25',
+        quantityUnit: 'KG',
+        amountArs: '3000',
+        idempotencyKey: 'idem-key-0000007'
+      }, user)
+    ).rejects.toMatchObject({
+      code: 'invalid_quantity_unit'
     });
 
     await expect(

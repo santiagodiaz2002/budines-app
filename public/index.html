@@ -17,7 +17,7 @@
     <link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
     <link rel="icon" href="/icons/favicon-16.png" sizes="16x16" type="image/png">
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
-    <link rel="stylesheet" href="/styles.css?v=auth-20260723">
+    <link rel="stylesheet" href="/styles.css?v=quantity-20260723">
   </head>
   <body data-auth-state="booting">
     <div class="boot-brand" aria-hidden="true">
@@ -118,19 +118,38 @@
               </div>
 
               <form id="sale-form" class="stack" novalidate>
-                <label class="field">
-                  <span>Gramos</span>
-                  <input
-                    id="grams-input"
-                    name="grams"
-                    type="text"
-                    inputmode="numeric"
-                    pattern="[0-9]*"
-                    maxlength="12"
-                    autocomplete="off"
-                    required
-                  >
-                </label>
+                <div class="field quantity-field">
+                  <span id="quantity-label">Cantidad</span>
+                  <div class="quantity-control">
+                    <input
+                      id="grams-input"
+                      name="grams"
+                      type="text"
+                      inputmode="numeric"
+                      pattern="[0-9]*"
+                      maxlength="12"
+                      autocomplete="off"
+                      aria-labelledby="quantity-label"
+                      required
+                    >
+                    <div class="quantity-unit-toggle" role="group" aria-label="Unidad de cantidad">
+                      <button
+                        id="quantity-unit-gr"
+                        class="quantity-unit-button is-active"
+                        type="button"
+                        data-quantity-unit="GR"
+                        aria-pressed="true"
+                      >GR</button>
+                      <button
+                        id="quantity-unit-ap"
+                        class="quantity-unit-button"
+                        type="button"
+                        data-quantity-unit="AP"
+                        aria-pressed="false"
+                      >AP</button>
+                    </div>
+                  </div>
+                </div>
 
                 <label class="field">
                   <span>Importe total</span>
@@ -526,6 +545,6 @@
     </div>
 
     <p id="live-region" class="sr-only" aria-live="polite" aria-atomic="true"></p>
-    <script type="module" src="/js/app.js?v=auth-20260723"></script>
+    <script type="module" src="/js/app.js?v=quantity-20260723"></script>
   </body>
 </html>

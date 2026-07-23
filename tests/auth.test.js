@@ -255,6 +255,7 @@ function createTestD1() {
   db.exec(readFileSync('migrations/0001_initial.sql', 'utf8'));
   db.exec(readFileSync('migrations/0002_remove_incorrect_62000_record.sql', 'utf8'));
   db.exec(readFileSync('migrations/0003_password_auth.sql', 'utf8'));
+  db.exec(readFileSync('migrations/0004_add_quantity_unit.sql', 'utf8'));
   insertOwner(db, 'santi', 'Santi', ownerPasswordData.santi);
   insertOwner(db, 'leandro', 'Leandro', ownerPasswordData.leandro);
   dbs.push(db);

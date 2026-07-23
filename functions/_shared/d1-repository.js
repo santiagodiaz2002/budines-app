@@ -55,6 +55,7 @@ export function createD1Repository(db) {
               type,
               user_id,
               grams,
+              quantity_unit,
               amount_ars,
               status,
               commercial_date,
@@ -64,13 +65,14 @@ export function createD1Repository(db) {
               idempotency_key,
               source
             )
-            VALUES (?, 'venta', ?, ?, ?, 'activo', ?, ?, NULL, NULL, ?, 'web')
+            VALUES (?, 'venta', ?, ?, ?, ?, 'activo', ?, ?, NULL, NULL, ?, 'web')
           `
         )
         .bind(
           record.id,
           record.userId,
           record.grams,
+          record.quantityUnit,
           record.amountArs,
           record.commercialDate,
           record.createdAt,
@@ -140,6 +142,7 @@ export function createD1Repository(db) {
               r.user_id,
               u.display_name AS user_display_name,
               r.grams,
+              COALESCE(r.quantity_unit, 'GR') AS quantity_unit,
               r.amount_ars,
               r.status,
               r.commercial_date,
@@ -182,6 +185,7 @@ async function recordSelect(db, whereClause, bindings) {
           r.user_id,
           u.display_name AS user_display_name,
           r.grams,
+          COALESCE(r.quantity_unit, 'GR') AS quantity_unit,
           r.amount_ars,
           r.status,
           r.commercial_date,
@@ -215,6 +219,7 @@ function mapRecord(row) {
     userId: row.user_id,
     userDisplayName: row.user_display_name,
     grams: row.grams === null || row.grams === undefined ? null : Number(row.grams),
+    quantityUnit: row.quantity_unit === 'AP' ? 'AP' : 'GR',
     amountArs: Number(row.amount_ars),
     status: row.status,
     commercialDate: row.commercial_date,

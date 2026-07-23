@@ -1,4 +1,5 @@
 export const MAX_INTEGER_DIGITS = 12;
+export const QUANTITY_UNITS = Object.freeze(['GR', 'AP']);
 
 const POSITIVE_INTEGER_PATTERN = /^[1-9][0-9]*$/;
 
@@ -45,13 +46,36 @@ export function parsePositiveIntegerText(rawValue, label) {
   };
 }
 
-export function validateSaleFields(gramsRaw, amountRaw) {
-  const grams = parsePositiveIntegerText(gramsRaw, 'Gramos');
+export function validateQuantityUnit(rawValue) {
+  if (!QUANTITY_UNITS.includes(rawValue)) {
+    return {
+      ok: false,
+      message: 'La unidad debe ser GR o AP.'
+    };
+  }
+
+  return {
+    ok: true,
+    value: rawValue
+  };
+}
+
+export function validateSaleFields(gramsRaw, quantityUnitRaw, amountRaw) {
+  const grams = parsePositiveIntegerText(gramsRaw, 'Cantidad');
   if (!grams.ok) {
     return {
       ok: false,
       field: 'grams',
       message: grams.message
+    };
+  }
+
+  const quantityUnit = validateQuantityUnit(quantityUnitRaw);
+  if (!quantityUnit.ok) {
+    return {
+      ok: false,
+      field: 'quantityUnit',
+      message: quantityUnit.message
     };
   }
 
@@ -67,6 +91,7 @@ export function validateSaleFields(gramsRaw, amountRaw) {
   return {
     ok: true,
     grams: grams.value,
+    quantityUnit: quantityUnit.value,
     amountArs: amount.value
   };
 }
