@@ -17,9 +17,9 @@
     <link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
     <link rel="icon" href="/icons/favicon-16.png" sizes="16x16" type="image/png">
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
-    <link rel="stylesheet" href="/styles.css?v=truco-visual-selector-20260723">
+    <link rel="stylesheet" href="/styles.css?v=auth-20260723">
   </head>
-  <body>
+  <body data-auth-state="booting">
     <div class="boot-brand" aria-hidden="true">
       <img src="/branding/logo-luz-en-ruinas.png" alt="">
     </div>
@@ -32,46 +32,72 @@
             <h1>Registro compartido</h1>
           </div>
         </div>
-        <p id="session-badge" class="session-badge" hidden></p>
+        <div id="user-session" class="session-area" hidden>
+          <p id="session-badge" class="session-badge"></p>
+          <button id="logout-button" class="quiet-button quiet-button--compact" type="button">Cerrar sesión</button>
+        </div>
       </header>
 
       <main id="main-content">
-        <section id="budines-tool" class="tool-panel" data-tool-panel="budines" role="tabpanel" aria-labelledby="tab-budines">
-          <section id="activation-view" class="panel auth-panel">
-            <img class="brand-logo brand-logo--activation" src="/branding/logo-luz-en-ruinas.png" alt="Luz en Ruinas" width="1448" height="1086">
-            <div class="panel-heading">
-              <p class="eyebrow">Activación</p>
-              <h2>Ingresá al dispositivo</h2>
-            </div>
+        <section id="auth-view" class="panel auth-panel" aria-labelledby="auth-title" hidden>
+          <img class="brand-logo brand-logo--auth" src="/branding/logo-luz-en-ruinas.png" alt="Luz en Ruinas" width="1448" height="1086">
+          <div class="panel-heading">
+            <p class="eyebrow">Budines</p>
+            <h2 id="auth-title">Ingresá a la app</h2>
+          </div>
 
-            <form id="activation-form" class="stack" novalidate>
-              <label class="field">
-                <span>Usuario</span>
-                <select id="activation-user" name="userName" autocomplete="username" required>
-                  <option value="Santi">Santi</option>
-                  <option value="Leandro">Leandro</option>
-                </select>
-              </label>
+          <div class="auth-mode-switcher" role="group" aria-label="Acceso">
+            <button id="auth-mode-login" class="switch-button is-active" type="button" data-auth-mode="login">Iniciar sesión</button>
+            <button id="auth-mode-register" class="switch-button" type="button" data-auth-mode="register">Crear cuenta</button>
+          </div>
 
-              <label class="field">
-                <span>Código de activación</span>
+          <form id="auth-form" class="stack" novalidate>
+            <label class="field auth-field">
+              <span>Nombre de usuario</span>
+              <input
+                id="auth-username"
+                name="username"
+                type="text"
+                autocomplete="username"
+                autocapitalize="none"
+                autocorrect="off"
+                spellcheck="false"
+                inputmode="text"
+                minlength="3"
+                maxlength="30"
+                pattern="[A-Za-z0-9._-]{3,30}"
+                enterkeyhint="next"
+                required
+              >
+            </label>
+
+            <label class="field auth-field">
+              <span>Contraseña</span>
+              <span class="password-control">
                 <input
-                  id="activation-code"
-                  name="activationCode"
+                  id="auth-password"
+                  name="password"
                   type="password"
-                  autocomplete="one-time-code"
+                  autocomplete="current-password"
                   autocapitalize="none"
+                  autocorrect="off"
                   spellcheck="false"
+                  minlength="8"
+                  maxlength="1024"
+                  enterkeyhint="go"
                   required
                 >
-              </label>
+                <button id="auth-password-toggle" class="quiet-button password-toggle" type="button" aria-pressed="false">Mostrar</button>
+              </span>
+            </label>
 
-              <p id="activation-error" class="form-message" role="status"></p>
-              <button id="activation-submit" class="primary-button" type="submit">Activar</button>
-            </form>
-          </section>
+            <p id="auth-message" class="form-message" role="status"></p>
+            <button id="auth-submit" class="primary-button" type="submit">Iniciar sesión</button>
+          </form>
+        </section>
 
-          <section id="app-view" hidden>
+        <section id="budines-tool" class="tool-panel" data-tool-panel="budines" role="tabpanel" aria-labelledby="tab-budines" hidden>
+          <section id="app-view">
             <section id="summary-card" class="summary-card" aria-live="polite">
               <p class="eyebrow">Total acumulado</p>
               <p id="summary-total" class="summary-total">$ 0</p>
@@ -89,7 +115,6 @@
                   <p class="eyebrow">Nueva operación</p>
                   <h2>Registrar venta</h2>
                 </div>
-                <button id="logout-button" class="quiet-button" type="button">Salir</button>
               </div>
 
               <form id="sale-form" class="stack" novalidate>
@@ -374,7 +399,7 @@
       </main>
     </div>
 
-    <nav id="bottom-tabs" class="bottom-tabs" role="tablist" aria-label="Herramientas">
+    <nav id="bottom-tabs" class="bottom-tabs" role="tablist" aria-label="Herramientas" hidden>
       <button id="tab-budines" class="bottom-tab is-active" type="button" role="tab" aria-selected="true" aria-controls="budines-tool" data-tool-tab="budines">
         <svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6.5h14M5 12h14M5 17.5h9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
         <span>Budines</span>
@@ -501,6 +526,6 @@
     </div>
 
     <p id="live-region" class="sr-only" aria-live="polite" aria-atomic="true"></p>
-    <script type="module" src="/js/app.js?v=truco-visual-selector-20260723"></script>
+    <script type="module" src="/js/app.js?v=auth-20260723"></script>
   </body>
 </html>

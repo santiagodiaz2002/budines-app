@@ -12,12 +12,22 @@ export async function getSession() {
   return apiRequest('/api/session');
 }
 
-export async function activateDevice({ userName, activationCode }) {
-  return apiRequest('/api/activate', {
+export async function login({ username, password }) {
+  return apiRequest('/api/login', {
     method: 'POST',
     body: {
-      userName,
-      activationCode
+      username,
+      password
+    }
+  });
+}
+
+export async function registerAccount({ username, password }) {
+  return apiRequest('/api/register', {
+    method: 'POST',
+    body: {
+      username,
+      password
     }
   });
 }

@@ -100,6 +100,18 @@ select:disabled {
   margin-bottom: 18px;
 }
 
+body[data-auth-state="auth"] .topbar,
+body[data-auth-state="booting"] .topbar {
+  display: none;
+}
+
+body[data-auth-state="auth"] .shell,
+body[data-auth-state="booting"] .shell {
+  display: grid;
+  align-content: center;
+  min-height: 100dvh;
+}
+
 .brand-lockup {
   display: flex;
   align-items: center;
@@ -120,7 +132,7 @@ select:disabled {
   aspect-ratio: 1448 / 1086;
 }
 
-.brand-logo--activation {
+.brand-logo--auth {
   width: min(100%, 210px);
   margin: 0 auto 16px;
 }
@@ -150,13 +162,27 @@ select:disabled {
   text-transform: uppercase;
 }
 
+.session-area {
+  display: grid;
+  justify-items: end;
+  gap: 6px;
+}
+
 .session-badge {
-  margin: 3px 0 0;
+  margin: 0;
   padding: 5px 8px;
   border: 1px solid var(--line);
   border-radius: 8px;
   color: #e9dcc8;
   font-size: 0.82rem;
+}
+
+.quiet-button--compact {
+  min-height: 34px;
+  padding: 0 10px;
+  border-color: var(--line);
+  color: #e9dcc8;
+  font-size: 0.78rem;
 }
 
 .panel,
@@ -174,7 +200,62 @@ select:disabled {
 
 .auth-panel {
   margin-top: 18px;
-  background: linear-gradient(180deg, #0a0b0f 0, #11131a 34%, var(--card) 34%);
+  background: linear-gradient(180deg, #05060a, #10131a);
+  color: #fff8ee;
+  padding: 22px;
+}
+
+.auth-panel .panel-heading .eyebrow,
+.auth-panel .field {
+  color: #e6d5be;
+}
+
+.auth-panel h2 {
+  color: #fff8ee;
+}
+
+.auth-mode-switcher {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 0 0 14px;
+}
+
+.auth-panel .switch-button {
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #eee0ca;
+}
+
+.auth-panel .switch-button.is-active {
+  background: var(--gold);
+  color: #181613;
+}
+
+.auth-field input {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: #10131a;
+  color: #fff8ee;
+}
+
+.password-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.password-control input {
+  min-width: 0;
+}
+
+.password-toggle {
+  min-height: 48px;
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #e9dcc8;
+  padding: 0 10px;
+}
+
+.auth-panel .form-message {
+  color: #ffb5ac;
 }
 
 .panel-heading {
@@ -369,6 +450,10 @@ select:disabled {
   border-top: 1px solid rgba(255, 255, 255, 0.13);
   background: rgba(9, 10, 14, 0.96);
   backdrop-filter: blur(14px);
+}
+
+body[data-budines-access="false"] .bottom-tabs {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .bottom-tab {

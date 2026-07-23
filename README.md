@@ -5,7 +5,7 @@ Budines es una PWA privada para dos usuarios, Santi y Leandro, destinada a regis
 ## Arquitectura
 
 - `public/`: HTML, CSS, JavaScript modular, manifest, service worker e iconos.
-- `public/js/navigation.js`: navegación inferior entre las cuatro pestañas.
+- `public/js/navigation.js`: navegación inferior según capacidades de la sesión.
 - `public/js/truco.js`: anotador local de Truco a 30.
 - `public/js/metronome-core-v2.js`, `public/js/metronome-editor.js`, `public/js/metronome-core.js` y `public/js/metronome.js`: modelo testeable, editor, biblioteca, voz y audio del metrónomo.
 - `public/js/tuner-core.js` y `public/js/tuner.js`: detección cromática, estabilización y UI del afinador.
@@ -15,13 +15,13 @@ Budines es una PWA privada para dos usuarios, Santi y Leandro, destinada a regis
 - `tests/`: pruebas determinísticas con Vitest.
 - Binding D1 obligatorio: `DB`.
 
-La sesión se activa con un código privado de entorno y se mantiene con una cookie opaca `HttpOnly`. El token completo solo vive en la cookie; D1 guarda el hash SHA-256.
+La sesión se inicia con nombre de usuario y contraseña. La cookie de sesión es opaca, `HttpOnly`, `Secure` y `SameSite=Lax`; D1 guarda solo el hash del token.
 
 ## Pestañas de la app
 
-La pantalla principal tiene una barra inferior fija con cuatro pestañas:
+La pantalla principal tiene una barra inferior fija. Owners ven cuatro pestañas; usuarios comunes ven solo herramientas locales:
 
-1. `Budines`: activación, carga de ventas, resumen, registros y baja lógica.
+1. `Budines`: carga de ventas, resumen, registros y baja lógica.
 2. `Truco`: anotador argentino a 30 puntos para `Nosotros` y `Ellos`.
 3. `Metrónomo`: metrónomo 4/4 normal y canciones locales por partes.
 4. `Afinador`: afinador cromático para guitarra, bajo y afinaciones alternativas.
@@ -125,15 +125,13 @@ En Windows:
 Copy-Item .dev.vars.example .dev.vars
 ```
 
-Editar `.dev.vars` y reemplazar los placeholders:
+Editar `.dev.vars` solo si se quiere cambiar la duración de sesión local:
 
 ```text
-SANTI_ACTIVATION_CODE="codigo-privado-real-de-santi"
-LEANDRO_ACTIVATION_CODE="codigo-privado-real-de-leandro"
 SESSION_DURATION_DAYS="30"
 ```
 
-No commitear `.dev.vars`. Está ignorado por Git.
+No guardar contraseñas en `.dev.vars`. No commitear `.dev.vars`; está ignorado por Git.
 
 ## Creación de la base D1
 
@@ -177,7 +175,23 @@ El binding debe llamarse exactamente `DB`.
 npm run db:migrate:local
 ```
 
-Esto crea tablas, índices, usuarios permitidos, inversión inicial de ARS 120000 y los saldos iniciales históricos. La migración `0002_remove_incorrect_62000_record.sql` da de baja lógica el saldo incorrecto de ARS 62000, por lo que el saldo inicial activo correcto queda en ARS 3000.
+Esto crea tablas, índices, usuarios comerciales permitidos, autenticación, inversión inicial de ARS 120000 y los saldos iniciales históricos. La migración `0002_remove_incorrect_62000_record.sql` da de baja lógica el saldo incorrecto de ARS 62000, por lo que el saldo inicial activo correcto queda en ARS 3000.
+
+## Seed de cuentas propietarias
+
+Después de aplicar migraciones, crear o actualizar las cuentas propietarias con una contraseña ingresada por stdin o una variable temporal:
+
+```bash
+printf '%s' "$BUDINES_OWNER_PASSWORD" | node scripts/seed-owners.mjs --local
+```
+
+Para remoto:
+
+```bash
+printf '%s' "$BUDINES_OWNER_PASSWORD" | node scripts/seed-owners.mjs --remote
+```
+
+El script no contiene ni imprime la contraseña. Genera salts distintos para Santi y Leandro.
 
 ## Aplicación de migraciones remota
 
@@ -227,7 +241,7 @@ Crear el proyecto Pages una sola vez:
 npx wrangler pages project create budines
 ```
 
-Desplegar cuando D1, binding y secretos estén configurados:
+Desplegar cuando D1, binding, migraciones y seed de owners estén configurados:
 
 ```bash
 npm run deploy
@@ -235,31 +249,13 @@ npm run deploy
 
 No ejecutar deploy remoto desde automatizaciones sin autorización.
 
-## Configuración de secretos en producción
-
-Ejecutar y pegar cada valor cuando Wrangler lo pida:
-
-```bash
-npx wrangler pages secret put SANTI_ACTIVATION_CODE --project-name budines
-npx wrangler pages secret put LEANDRO_ACTIVATION_CODE --project-name budines
-npx wrangler pages secret put SESSION_DURATION_DAYS --project-name budines
-```
-
-Usar códigos privados distintos para Santi y Leandro.
-
-## Activación del iPhone de Santi
+## Inicio de sesión de owners
 
 1. Abrir la URL de producción de Pages en Safari.
-2. Elegir usuario `Santi`.
-3. Ingresar el código privado configurado en `SANTI_ACTIVATION_CODE`.
-4. Confirmar que aparece la pantalla principal con la identidad `Santi`.
+2. Iniciar sesión con `santi` o `leandro`.
+3. Confirmar que aparecen Budines, Truco, Metrónomo y Afinador.
 
-## Activación del iPhone de Leandro
-
-1. Abrir la URL de producción de Pages en Safari.
-2. Elegir usuario `Leandro`.
-3. Ingresar el código privado configurado en `LEANDRO_ACTIVATION_CODE`.
-4. Confirmar que aparece la pantalla principal con la identidad `Leandro`.
+Las cuentas creadas desde Registro son comunes y solo ven Truco, Metrónomo y Afinador.
 
 ## Instalación mediante Safari
 
@@ -303,18 +299,16 @@ La eliminación está disponible para ventas activas y saldos iniciales activos.
 
 ## Rotación de credenciales
 
-1. Cambiar `SANTI_ACTIVATION_CODE` o `LEANDRO_ACTIVATION_CODE` con `wrangler pages secret put`.
-2. Cerrar sesión en el dispositivo afectado.
-3. Activar de nuevo con el código nuevo.
-
-Las sesiones existentes no dependen del código de activación anterior. Para invalidarlas, usar revocación.
+1. Ejecutar `node scripts/seed-owners.mjs --remote` con la nueva contraseña por stdin o variable temporal.
+2. Revocar sesiones existentes del owner afectado.
+3. Iniciar sesión de nuevo con la contraseña nueva.
 
 ## Revocación de sesiones
 
 Revocar todas las sesiones de un usuario en D1:
 
 ```bash
-npx wrangler d1 execute budines --remote --command "UPDATE sessions SET revoked_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE user_id = 'santi' AND revoked_at IS NULL;"
+npx wrangler d1 execute budines --remote --command "UPDATE app_sessions SET revoked_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE user_id = 'santi' AND revoked_at IS NULL;"
 ```
 
 Cambiar `santi` por `leandro` si corresponde.
@@ -336,7 +330,7 @@ npx wrangler d1 export budines --local --output=budines-local-backup.sql
 ## Recuperación ante errores
 
 - Si `npm run dev` falla por secretos faltantes, revisar `.dev.vars`.
-- Si `/api/summary` devuelve `401`, activar el dispositivo.
+- Si `/api/summary` devuelve `401`, iniciar sesión.
 - Si D1 remoto falla, verificar `database_id`, binding `DB` y migraciones remotas.
 - Si un registro se envió dos veces con la misma clave de idempotencia, la API devuelve la operación existente y no duplica filas.
 - Si se eliminó un registro por error, no hay restauración en esta versión; conservar la fila y corregir mediante una migración o herramienta administrativa diseñada aparte.
@@ -346,7 +340,7 @@ npx wrangler d1 export budines --local --output=budines-local-backup.sql
 - Cuenta Cloudflare autenticada.
 - Base D1 remota real.
 - Binding `DB` configurado en el proyecto Pages remoto.
-- Secretos productivos.
+- Seed productivo de owners.
 - Dominio o URL final de Pages.
 - Safari real en iPhone.
 - Instalación desde `Agregar a pantalla de inicio`.
@@ -357,11 +351,11 @@ npx wrangler d1 export budines --local --output=budines-local-backup.sql
 1. `wrangler.jsonc` contiene `database_id` real.
 2. `npm run validate` pasa localmente.
 3. `npm run db:migrate:remote` termina correctamente.
-4. Los secretos productivos existen en Pages.
+4. El seed productivo creó solo Santi y Leandro como owners.
 5. El proyecto Pages tiene binding D1 `DB`.
 6. `/api/health` responde en producción.
-7. Activación de Santi funciona.
-8. Activación de Leandro funciona.
+7. Login de Santi funciona.
+8. Login de Leandro funciona.
 9. Resumen inicial muestra ARS 3000, ARS 120000 y ARS 117000.
 10. Una venta nueva actualiza resumen y registros.
 11. Repetir una petición con la misma clave no duplica.

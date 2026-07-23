@@ -60,7 +60,7 @@ beforeEach(async () => {
 
   vi.resetModules();
   await import('../public/js/app.js');
-  await waitFor(() => !document.querySelector('#app-view').hidden);
+  await waitFor(() => !document.querySelector('#budines-tool').hidden);
   document.querySelector('#show-records').click();
   await waitFor(() => document.querySelectorAll('[data-record-card]').length === records.length);
 });
@@ -148,7 +148,10 @@ async function handleFetch(input, options = {}) {
       authenticated: true,
       user: {
         id: 'santi',
-        displayName: 'Santi'
+        displayName: 'Santi',
+        capabilities: {
+          canAccessBudines: true
+        }
       }
     });
   }

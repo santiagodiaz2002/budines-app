@@ -1,12 +1,13 @@
 import {
-  activateDevice,
   createRecord,
   deleteRecord,
   getSession,
   getSummary,
   listRecords,
-  logout
-} from './api.js';
+  login,
+  logout,
+  registerAccount
+} from './api.js?v=auth-20260723';
 import {
   formatArs,
   formatCommercialDate,
@@ -15,21 +16,48 @@ import {
   formatRecordType
 } from './format.js';
 import { createAudioCoordinator } from './audio-coordinator.js';
-import { initMetronome } from './metronome-editor.js?v=metronome-continuous-20260716';
+import { initMetronome } from './metronome-editor.js?v=auth-20260723';
 import { initToolNavigation } from './navigation.js';
-import { initTruco } from './truco.js?v=truco-visual-selector-20260723';
+import { initTruco } from './truco.js?v=auth-20260723';
 import { initTuner } from './tuner.js';
+import { clearLocalStorageUser, setLocalStorageUser } from './local-storage.js?v=auth-20260723';
 import { parsePositiveIntegerText, validateSaleFields } from './validation.js';
 
+const AUTH_MODES = Object.freeze({
+  login: {
+    title: 'Ingresá a la app',
+    submit: 'Iniciar sesión',
+    busy: 'Ingresando...',
+    autocomplete: 'current-password'
+  },
+  register: {
+    title: 'Crear cuenta',
+    submit: 'Crear cuenta',
+    busy: 'Creando...',
+    autocomplete: 'new-password'
+  }
+});
+
+const OWNER_TABS = ['budines', 'truco', 'metronome', 'tuner'];
+const COMMON_TABS = ['truco', 'metronome', 'tuner'];
+
 const dom = {
-  activationView: document.querySelector('#activation-view'),
-  activationForm: document.querySelector('#activation-form'),
-  activationUser: document.querySelector('#activation-user'),
-  activationCode: document.querySelector('#activation-code'),
-  activationSubmit: document.querySelector('#activation-submit'),
-  activationError: document.querySelector('#activation-error'),
-  appView: document.querySelector('#app-view'),
+  authView: document.querySelector('#auth-view'),
+  authForm: document.querySelector('#auth-form'),
+  authTitle: document.querySelector('#auth-title'),
+  authUsername: document.querySelector('#auth-username'),
+  authPassword: document.querySelector('#auth-password'),
+  authPasswordToggle: document.querySelector('#auth-password-toggle'),
+  authSubmit: document.querySelector('#auth-submit'),
+  authMessage: document.querySelector('#auth-message'),
+  authModeButtons: [...document.querySelectorAll('[data-auth-mode]')],
+  userSession: document.querySelector('#user-session'),
   sessionBadge: document.querySelector('#session-badge'),
+  logoutButton: document.querySelector('#logout-button'),
+  bottomTabs: document.querySelector('#bottom-tabs'),
+  budinesTool: document.querySelector('#budines-tool'),
+  budinesTab: document.querySelector('#tab-budines'),
+  appView: document.querySelector('#app-view'),
   summaryTotal: document.querySelector('#summary-total'),
   summaryLines: document.querySelector('#summary-lines'),
   showEntry: document.querySelector('#show-entry'),
@@ -42,7 +70,6 @@ const dom = {
   amountPreview: document.querySelector('#amount-preview'),
   saleSubmit: document.querySelector('#sale-submit'),
   saleError: document.querySelector('#sale-error'),
-  logoutButton: document.querySelector('#logout-button'),
   reloadRecords: document.querySelector('#reload-records'),
   recordsState: document.querySelector('#records-state'),
   recordsList: document.querySelector('#records-list'),
@@ -60,6 +87,8 @@ const dom = {
 
 const state = {
   user: null,
+  authMode: 'login',
+  isAuthBusy: false,
   isSubmittingSale: false,
   saleIdempotencyKey: null,
   lastSalePayload: null,
@@ -68,37 +97,37 @@ const state = {
   hasMoreRecords: false,
   recordPendingDelete: null,
   deleteTrigger: null,
-  isDeletingRecord: false
+  isDeletingRecord: false,
+  tools: {
+    initialized: false,
+    navigation: null,
+    metronome: null,
+    tuner: null
+  }
+};
+
+const budinesMount = {
+  panelParent: dom.budinesTool?.parentNode || null,
+  panelNextSibling: dom.budinesTool?.nextSibling || null,
+  tabParent: dom.budinesTab?.parentNode || null,
+  tabNextSibling: dom.budinesTab?.nextSibling || null
 };
 
 init();
 
 function init() {
   registerServiceWorker();
-  initLocalTools();
   bindEvents();
+  setAuthMode('login');
   bootSession();
 }
 
-function initLocalTools() {
-  const audioCoordinator = createAudioCoordinator();
-  initToolSafely('navegación', () => initToolNavigation());
-  initToolSafely('truco', () => initTruco());
-  initToolSafely('metrónomo', () => initMetronome(document.querySelector('#metronome-tool'), audioCoordinator));
-  initToolSafely('afinador', () => initTuner(document.querySelector('#tuner-tool'), audioCoordinator));
-}
-
-function initToolSafely(name, initializer) {
-  try {
-    return initializer();
-  } catch (error) {
-    console.error(`No se pudo iniciar ${name}.`, error);
-    return null;
-  }
-}
-
 function bindEvents() {
-  dom.activationForm.addEventListener('submit', handleActivationSubmit);
+  dom.authForm.addEventListener('submit', handleAuthSubmit);
+  for (const button of dom.authModeButtons) {
+    button.addEventListener('click', () => setAuthMode(button.dataset.authMode));
+  }
+  dom.authPasswordToggle.addEventListener('click', togglePasswordVisibility);
   dom.saleForm.addEventListener('submit', handleSaleSubmit);
   dom.amountInput.addEventListener('input', handleAmountInput);
   dom.gramsInput.addEventListener('input', handleSaleInputChange);
@@ -117,48 +146,52 @@ function bindEvents() {
 }
 
 async function bootSession() {
-  setActivationBusy(true);
+  setAuthBusy(true);
+  document.body.dataset.authState = 'booting';
   try {
     const session = await getSession();
     if (session.authenticated) {
-      showApp(session.user);
-      await refreshAppData();
+      await showApp(session.user);
     } else {
-      showActivation();
+      showAuth();
     }
   } catch (error) {
-    showActivation(error.message);
+    showAuth(error.message);
   } finally {
-    setActivationBusy(false);
+    setAuthBusy(false);
   }
 }
 
-async function handleActivationSubmit(event) {
+async function handleAuthSubmit(event) {
   event.preventDefault();
-  dom.activationError.textContent = '';
-  setActivationBusy(true);
+  if (state.isAuthBusy) {
+    return;
+  }
+
+  dom.authMessage.textContent = '';
+  setAuthBusy(true);
 
   try {
-    const result = await activateDevice({
-      userName: dom.activationUser.value,
-      activationCode: dom.activationCode.value
-    });
-    dom.activationCode.value = '';
-    showApp(result.user);
-    announce('Dispositivo activado.');
-    await refreshAppData();
-    dom.gramsInput.focus();
+    const credentials = {
+      username: dom.authUsername.value,
+      password: dom.authPassword.value
+    };
+    const result = state.authMode === 'login' ? await login(credentials) : await registerAccount(credentials);
+    dom.authPassword.value = '';
+    await showApp(result.user);
+    announce(state.authMode === 'login' ? 'Sesión iniciada.' : 'Cuenta creada.');
   } catch (error) {
-    dom.activationError.textContent = error.message;
+    dom.authMessage.textContent = error.message;
     announce(error.message);
+    dom.authPassword.focus();
   } finally {
-    setActivationBusy(false);
+    setAuthBusy(false);
   }
 }
 
 async function handleSaleSubmit(event) {
   event.preventDefault();
-  if (state.isSubmittingSale) {
+  if (state.isSubmittingSale || !canAccessBudines()) {
     return;
   }
 
@@ -228,19 +261,23 @@ function handleSaleInputChange() {
 
 async function handleLogout() {
   dom.logoutButton.disabled = true;
+  stopLocalAudio();
   try {
     await logout();
   } finally {
     state.user = null;
-    showActivation();
-    announce('Sesion cerrada.');
+    clearLocalStorageUser();
+    clearBudinesData();
+    showAuth();
+    announce('Sesión cerrada.');
     dom.logoutButton.disabled = false;
+    reloadAfterLogout();
   }
 }
 
 function handleRecordsClick(event) {
   const card = event.target.closest('[data-record-card]');
-  if (!card) {
+  if (!card || !canAccessBudines()) {
     return;
   }
 
@@ -250,7 +287,7 @@ function handleRecordsClick(event) {
 
 async function handleDeleteSubmit(event) {
   event.preventDefault();
-  if (!state.recordPendingDelete || state.isDeletingRecord) {
+  if (!state.recordPendingDelete || state.isDeletingRecord || !canAccessBudines()) {
     return;
   }
 
@@ -280,10 +317,17 @@ async function handleDeleteSubmit(event) {
 }
 
 async function refreshAppData() {
+  if (!canAccessBudines()) {
+    return;
+  }
   await Promise.all([loadSummary(), loadRecords({ reset: true })]);
 }
 
 async function loadSummary() {
+  if (!canAccessBudines()) {
+    return;
+  }
+
   try {
     const result = await getSummary();
     renderSummary(result.summary);
@@ -294,6 +338,10 @@ async function loadSummary() {
 }
 
 async function loadRecords({ reset }) {
+  if (!canAccessBudines()) {
+    return;
+  }
+
   if (reset) {
     state.recordsOffset = 0;
     dom.recordsList.replaceChildren();
@@ -324,12 +372,12 @@ async function loadRecords({ reset }) {
 
 function renderSummary(summary) {
   dom.summaryTotal.textContent = formatArs(summary.totalArs);
-  const lines = [summaryLine('Inversion', formatArs(summary.investmentArs))];
+  const lines = [summaryLine('Inversión', formatArs(summary.investmentArs))];
 
   if (!summary.investmentRecovered) {
     lines.push(summaryLine('Falta recuperar', formatArs(summary.missingArs), 'is-missing'));
   } else {
-    lines.push(summaryLine('Inversion recuperada', 'Si'));
+    lines.push(summaryLine('Inversión recuperada', 'Sí'));
     lines.push(summaryLine('Ganancia real', formatArs(summary.profitArs), summary.profitArs > 0 ? 'is-profit' : ''));
   }
 
@@ -418,7 +466,7 @@ function detailItem(label, value) {
 
 function openDeleteDialog(record) {
   state.recordPendingDelete = record;
-  dom.voidCopy.textContent = `Vas a eliminar ${formatArs(record.amountArs)}. La fila queda guardada como baja logica y deja de contar en el resumen.`;
+  dom.voidCopy.textContent = `Vas a eliminar ${formatArs(record.amountArs)}. La fila queda guardada como baja lógica y deja de contar en el resumen.`;
   dom.voidDetails.replaceChildren(
     detailItem('Importe', formatArs(record.amountArs)),
     detailItem('Tipo', formatRecordType(record.type)),
@@ -471,6 +519,10 @@ function handleDocumentKeydown(event) {
 }
 
 function switchView(view) {
+  if (!canAccessBudines()) {
+    return;
+  }
+
   const records = view === 'records';
   dom.entrySection.hidden = records;
   dom.recordsSection.hidden = !records;
@@ -484,23 +536,120 @@ function switchView(view) {
   }
 }
 
-function showActivation(message = '') {
-  dom.activationView.hidden = false;
-  dom.appView.hidden = true;
-  dom.sessionBadge.hidden = true;
+function showAuth(message = '') {
+  document.body.dataset.authState = 'auth';
+  dom.authView.hidden = false;
+  hideToolPanels();
+  dom.bottomTabs.hidden = true;
+  dom.userSession.hidden = true;
   dom.sessionBadge.textContent = '';
-  dom.activationError.textContent = message;
-  dom.activationCode.value = '';
-  dom.activationCode.focus();
+  dom.authMessage.textContent = message;
+  dom.authPassword.value = '';
+  dom.authUsername.focus();
 }
 
-function showApp(user) {
+async function showApp(user) {
   state.user = user;
-  dom.activationView.hidden = true;
-  dom.appView.hidden = false;
-  dom.sessionBadge.hidden = false;
+  setLocalStorageUser(user);
+  setBudinesAccess(Boolean(user.capabilities?.canAccessBudines));
+  initLocalTools();
+  initNavigationForUser(user);
+
+  document.body.dataset.authState = 'app';
+  dom.authView.hidden = true;
+  dom.bottomTabs.hidden = false;
+  dom.userSession.hidden = false;
   dom.sessionBadge.textContent = user.displayName;
-  switchView('entry');
+
+  if (canAccessBudines()) {
+    state.tools.navigation?.selectTab('budines');
+    switchView('entry');
+    await refreshAppData();
+    dom.gramsInput.focus();
+  } else {
+    clearBudinesData();
+    state.tools.navigation?.selectTab('truco');
+  }
+}
+
+function initLocalTools() {
+  if (state.tools.initialized) {
+    return;
+  }
+
+  const audioCoordinator = createAudioCoordinator();
+  initToolSafely('truco', () => initTruco());
+  state.tools.metronome = initToolSafely('metrónomo', () =>
+    initMetronome(document.querySelector('#metronome-tool'), audioCoordinator)
+  );
+  state.tools.tuner = initToolSafely('afinador', () => initTuner(document.querySelector('#tuner-tool'), audioCoordinator));
+  state.tools.initialized = true;
+}
+
+function initToolSafely(name, initializer) {
+  try {
+    return initializer();
+  } catch (error) {
+    console.error(`No se pudo iniciar ${name}.`, error);
+    return null;
+  }
+}
+
+function initNavigationForUser(user) {
+  if (state.tools.navigation) {
+    return;
+  }
+
+  const allowedTabs = user.capabilities?.canAccessBudines ? OWNER_TABS : COMMON_TABS;
+  state.tools.navigation = initToolNavigation({
+    allowedTabs,
+    initialTab: allowedTabs[0]
+  });
+}
+
+function setBudinesAccess(allowed) {
+  document.body.dataset.budinesAccess = allowed ? 'true' : 'false';
+  if (allowed) {
+    attachBudinesPanel();
+    return;
+  }
+
+  detachBudinesPanel();
+}
+
+function attachBudinesPanel() {
+  if (dom.budinesTool && !dom.budinesTool.isConnected && budinesMount.panelParent) {
+    budinesMount.panelParent.insertBefore(dom.budinesTool, budinesMount.panelNextSibling);
+  }
+  if (dom.budinesTab && !dom.budinesTab.isConnected && budinesMount.tabParent) {
+    budinesMount.tabParent.insertBefore(dom.budinesTab, budinesMount.tabNextSibling);
+  }
+}
+
+function detachBudinesPanel() {
+  dom.budinesTool?.remove();
+  dom.budinesTab?.remove();
+}
+
+function hideToolPanels() {
+  for (const panel of document.querySelectorAll('[data-tool-panel]')) {
+    panel.hidden = true;
+  }
+}
+
+function clearBudinesData() {
+  dom.summaryTotal.textContent = '$ 0';
+  dom.summaryLines.replaceChildren();
+  dom.recordsList.replaceChildren();
+  dom.recordsState.textContent = '';
+  dom.loadMoreRecords.hidden = true;
+  dom.saleError.textContent = '';
+  dom.amountPreview.textContent = '';
+  dom.gramsInput.value = '';
+  dom.amountInput.value = '';
+  state.saleIdempotencyKey = null;
+  state.lastSalePayload = null;
+  state.recordPendingDelete = null;
 }
 
 function showSaleError(message, field) {
@@ -512,11 +661,36 @@ function showSaleError(message, field) {
   announce(message);
 }
 
-function setActivationBusy(isBusy) {
-  dom.activationSubmit.disabled = isBusy;
-  dom.activationUser.disabled = isBusy;
-  dom.activationCode.disabled = isBusy;
-  dom.activationSubmit.textContent = isBusy ? 'Activando...' : 'Activar';
+function setAuthMode(mode) {
+  if (!Object.hasOwn(AUTH_MODES, mode)) {
+    return;
+  }
+
+  state.authMode = mode;
+  const config = AUTH_MODES[mode];
+  dom.authTitle.textContent = config.title;
+  dom.authSubmit.textContent = config.submit;
+  dom.authPassword.autocomplete = config.autocomplete;
+  dom.authMessage.textContent = '';
+
+  for (const button of dom.authModeButtons) {
+    const active = button.dataset.authMode === mode;
+    button.classList.toggle('is-active', active);
+    button.setAttribute('aria-pressed', active ? 'true' : 'false');
+  }
+}
+
+function setAuthBusy(isBusy) {
+  state.isAuthBusy = isBusy;
+  const config = AUTH_MODES[state.authMode];
+  dom.authSubmit.disabled = isBusy;
+  dom.authUsername.disabled = isBusy;
+  dom.authPassword.disabled = isBusy;
+  dom.authPasswordToggle.disabled = isBusy;
+  for (const button of dom.authModeButtons) {
+    button.disabled = isBusy;
+  }
+  dom.authSubmit.textContent = isBusy ? config.busy : config.submit;
 }
 
 function setSaleBusy(isBusy) {
@@ -528,6 +702,38 @@ function setSaleBusy(isBusy) {
   if (!isBusy) {
     dom.gramsInput.removeAttribute('aria-invalid');
     dom.amountInput.removeAttribute('aria-invalid');
+  }
+}
+
+function togglePasswordVisibility() {
+  const visible = dom.authPassword.type === 'text';
+  dom.authPassword.type = visible ? 'password' : 'text';
+  dom.authPasswordToggle.textContent = visible ? 'Mostrar' : 'Ocultar';
+  dom.authPasswordToggle.setAttribute('aria-pressed', visible ? 'false' : 'true');
+  dom.authPassword.focus();
+}
+
+function canAccessBudines() {
+  return Boolean(state.user?.capabilities?.canAccessBudines);
+}
+
+function stopLocalAudio() {
+  state.tools.metronome?.stop?.({ silent: true });
+  state.tools.tuner?.stop?.();
+  globalThis.window?.speechSynthesis?.cancel?.();
+}
+
+function reloadAfterLogout() {
+  try {
+    globalThis.window?.setTimeout?.(() => {
+      try {
+        globalThis.window.location.reload();
+      } catch {
+        // A reload is a convenience for a clean user switch; logout is already complete.
+      }
+    }, 0);
+  } catch {
+    // A reload is a convenience for a clean user switch; logout is already complete.
   }
 }
 

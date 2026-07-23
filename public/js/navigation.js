@@ -4,15 +4,18 @@ export function initToolNavigation({
   nav = document.querySelector('#bottom-tabs'),
   panels = [...document.querySelectorAll('[data-tool-panel]')],
   initialTab = 'budines',
+  allowedTabs = TOOL_TABS,
   onChange = () => {}
 } = {}) {
   if (!nav) {
     return null;
   }
 
-  const buttons = [...nav.querySelectorAll('[data-tool-tab]')];
-  const panelMap = new Map(panels.map((panel) => [panel.dataset.toolPanel, panel]));
-  let currentTab = TOOL_TABS.includes(initialTab) ? initialTab : 'budines';
+  const normalizedAllowedTabs = allowedTabs.filter((tab) => TOOL_TABS.includes(tab));
+  const tabs = normalizedAllowedTabs.length ? normalizedAllowedTabs : TOOL_TABS;
+  const buttons = [...nav.querySelectorAll('[data-tool-tab]')].filter((button) => tabs.includes(button.dataset.toolTab));
+  const panelMap = new Map(panels.filter((panel) => tabs.includes(panel.dataset.toolPanel)).map((panel) => [panel.dataset.toolPanel, panel]));
+  let currentTab = tabs.includes(initialTab) ? initialTab : tabs[0];
 
   nav.addEventListener('click', (event) => {
     const button = findTabButton(event);
@@ -36,7 +39,7 @@ export function initToolNavigation({
   });
 
   function selectTab(tab) {
-    if (!TOOL_TABS.includes(tab)) {
+    if (!tabs.includes(tab)) {
       return;
     }
     currentTab = tab;

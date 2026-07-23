@@ -1,5 +1,5 @@
 import { clearSessionCookie, revokeCurrentSession } from '../_shared/auth.js';
-import { assertDb, jsonResponse, methodNotAllowed, withApiErrorHandling } from '../_shared/http.js';
+import { assertDb, assertSameOrigin, jsonResponse, methodNotAllowed, withApiErrorHandling } from '../_shared/http.js';
 
 export async function onRequest(context) {
   if (context.request.method !== 'POST') {
@@ -7,6 +7,7 @@ export async function onRequest(context) {
   }
 
   return withApiErrorHandling(async () => {
+    assertSameOrigin(context.request);
     assertDb(context.env);
     await revokeCurrentSession(context);
 
@@ -16,7 +17,7 @@ export async function onRequest(context) {
       },
       {
         headers: {
-          'Set-Cookie': clearSessionCookie(context.request.url)
+          'Set-Cookie': clearSessionCookie()
         }
       }
     );

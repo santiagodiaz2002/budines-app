@@ -24,6 +24,7 @@ import {
   upsertSongInLibrary,
   validateEditableBlocks
 } from './metronome-core-v2.js?v=metronome-continuous-20260716';
+import { getStorage, scopedStorageKey } from './local-storage.js?v=auth-20260723';
 
 const STORAGE_KEY = 'budines.metronome.v1';
 const SONGS_STORAGE_KEY = 'budines.metronome.songs.v2';
@@ -1083,7 +1084,7 @@ export function initMetronome(root = document.querySelector('#metronome-tool'), 
 
   function persistState() {
     getStorage()?.setItem(
-      STORAGE_KEY,
+      scopedStorageKey(STORAGE_KEY),
       JSON.stringify({
         assetVersion: ASSET_VERSION,
         bpm: currentBpm(),
@@ -1098,7 +1099,7 @@ export function initMetronome(root = document.querySelector('#metronome-tool'), 
   }
 
   function persistLibrary() {
-    getStorage()?.setItem(SONGS_STORAGE_KEY, JSON.stringify(library));
+    getStorage()?.setItem(scopedStorageKey(SONGS_STORAGE_KEY), JSON.stringify(library));
   }
 
   function focusPartNameInput(index) {
@@ -1517,7 +1518,7 @@ function collectDom(root) {
 
 function readState() {
   try {
-    const parsed = JSON.parse(getStorage()?.getItem(STORAGE_KEY));
+    const parsed = JSON.parse(getStorage()?.getItem(scopedStorageKey(STORAGE_KEY)));
     const bpm = Number.isInteger(parsed?.bpm) && parseBpm(String(parsed.bpm)).ok ? parsed.bpm : DEFAULT_BPM;
     const volume = Number.isFinite(parsed?.volume) ? Math.min(1, Math.max(0, parsed.volume)) : DEFAULT_VOLUME;
     const voiceVolume = Number.isFinite(parsed?.voiceVolume) ? Math.min(1, Math.max(0, parsed.voiceVolume)) : DEFAULT_VOICE_VOLUME;
@@ -1546,7 +1547,9 @@ function readState() {
 function readLibrary() {
   try {
     const storage = getStorage();
-    const raw = storage?.getItem(SONGS_STORAGE_KEY) || storage?.getItem(OLD_SONGS_STORAGE_KEY);
+    const raw =
+      storage?.getItem(scopedStorageKey(SONGS_STORAGE_KEY)) ||
+      storage?.getItem(scopedStorageKey(OLD_SONGS_STORAGE_KEY));
     if (!raw) {
       return {
         library: sanitizeSongLibrary({ songs: [] }),
@@ -1591,10 +1594,6 @@ function formatLocalDateTime(value) {
     dateStyle: 'short',
     timeStyle: 'short'
   }).format(date);
-}
-
-function getStorage() {
-  return globalThis.localStorage || globalThis.window?.localStorage || null;
 }
 
 function getBrowserWindow() {
