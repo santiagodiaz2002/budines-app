@@ -49,6 +49,25 @@ describe('navegacion inferior de herramientas', () => {
     expect(document.querySelector('#truco-tool').hidden).toBe(false);
     expect(document.querySelector('#tab-truco').getAttribute('aria-selected')).toBe('true');
   });
+
+  it('permite inicializar solo herramientas locales sin Budines', () => {
+    setupDom();
+    document.querySelector('#tab-budines').remove();
+    document.querySelector('#budines-tool').remove();
+
+    const nav = initToolNavigation({
+      allowedTabs: ['truco', 'metronome', 'tuner'],
+      initialTab: 'truco'
+    });
+
+    expect(nav.currentTab).toBe('truco');
+    expect([...document.querySelectorAll('[data-tool-tab]')].map((tab) => tab.dataset.toolTab)).toEqual([
+      'truco',
+      'metronome',
+      'tuner'
+    ]);
+    expect(document.querySelector('#truco-tool').hidden).toBe(false);
+  });
 });
 
 function setupDom() {

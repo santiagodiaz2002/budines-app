@@ -9,6 +9,31 @@ export class ApiError extends Error {
   }
 }
 
+export function assertSameOrigin(request) {
+  const method = request.method.toUpperCase();
+  if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') {
+    return;
+  }
+
+  const origin = request.headers.get('Origin');
+  if (!origin) {
+    throw new ApiError(403, 'invalid_origin', 'Origen no permitido.');
+  }
+
+  let requestOrigin;
+  let headerOrigin;
+  try {
+    requestOrigin = new URL(request.url).origin;
+    headerOrigin = new URL(origin).origin;
+  } catch {
+    throw new ApiError(403, 'invalid_origin', 'Origen no permitido.');
+  }
+
+  if (requestOrigin !== headerOrigin) {
+    throw new ApiError(403, 'invalid_origin', 'Origen no permitido.');
+  }
+}
+
 export function jsonResponse(data, { status = 200, headers = {} } = {}) {
   const responseHeaders = new Headers(headers);
   responseHeaders.set('Content-Type', 'application/json; charset=utf-8');
@@ -85,6 +110,11 @@ export async function withApiErrorHandling(handler) {
         { status: error.status }
       );
     }
+
+    console.error('Unhandled API error', {
+      name: error?.name || 'Error',
+      message: String(error?.message || 'Unknown error').slice(0, 240)
+    });
 
     return jsonResponse(
       {

@@ -1,3 +1,5 @@
+import { getStorage, scopedStorageKey } from './local-storage.js?v=auth-20260723';
+
 const STORAGE_KEY = 'budines.truco.v1';
 export const TRUCO_VISUAL_STORAGE_KEY = 'budines.truco.visual.v1';
 export const DEFAULT_TRUCO_VISUAL_MODEL = 'joint';
@@ -416,7 +418,7 @@ function groupPoints(group) {
 
 function readState() {
   try {
-    return sanitizeTrucoState(JSON.parse(getStorage()?.getItem(STORAGE_KEY)));
+    return sanitizeTrucoState(JSON.parse(getStorage()?.getItem(scopedStorageKey(STORAGE_KEY))));
   } catch {
     return createDefaultTrucoState();
   }
@@ -424,18 +426,18 @@ function readState() {
 
 function readVisualModel() {
   try {
-    return sanitizeTrucoVisualModel(getStorage()?.getItem(TRUCO_VISUAL_STORAGE_KEY));
+    return sanitizeTrucoVisualModel(getStorage()?.getItem(scopedStorageKey(TRUCO_VISUAL_STORAGE_KEY)));
   } catch {
     return DEFAULT_TRUCO_VISUAL_MODEL;
   }
 }
 
 function persistState(state) {
-  getStorage()?.setItem(STORAGE_KEY, JSON.stringify(state));
+  getStorage()?.setItem(scopedStorageKey(STORAGE_KEY), JSON.stringify(state));
 }
 
 function persistVisualModel(value) {
-  getStorage()?.setItem(TRUCO_VISUAL_STORAGE_KEY, sanitizeTrucoVisualModel(value));
+  getStorage()?.setItem(scopedStorageKey(TRUCO_VISUAL_STORAGE_KEY), sanitizeTrucoVisualModel(value));
 }
 
 function preloadTallyAssets() {
@@ -465,8 +467,4 @@ function isValidScores(value) {
 
 function clampScore(value) {
   return Math.min(MAX_SCORE, Math.max(MIN_SCORE, value));
-}
-
-function getStorage() {
-  return globalThis.localStorage || globalThis.window?.localStorage || null;
 }

@@ -34,6 +34,18 @@ export function constantTimeEqualHex(a, b) {
   return diff === 0;
 }
 
-function bytesToHex(bytes) {
+export function bytesToHex(bytes) {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+export function hexToBytes(value) {
+  if (typeof value !== 'string' || value.length % 2 !== 0 || !/^[a-f0-9]+$/i.test(value)) {
+    throw new TypeError('Invalid hex value.');
+  }
+
+  const bytes = new Uint8Array(value.length / 2);
+  for (let index = 0; index < bytes.length; index += 1) {
+    bytes[index] = Number.parseInt(value.slice(index * 2, index * 2 + 2), 16);
+  }
+  return bytes;
 }

@@ -1,7 +1,8 @@
-import { requireSession } from '../../_shared/auth.js';
+import { requireBudinesAccess } from '../../_shared/auth.js';
 import { createD1Repository } from '../../_shared/d1-repository.js';
 import {
   assertDb,
+  assertSameOrigin,
   jsonResponse,
   methodNotAllowed,
   readJsonBody,
@@ -25,7 +26,7 @@ export async function onRequest(context) {
 
 function handleGet(context) {
   return withApiErrorHandling(async () => {
-    await requireSession(context);
+    await requireBudinesAccess(context);
     const url = new URL(context.request.url);
     const { limit, offset } = parsePagination(url.searchParams);
     const repo = createD1Repository(assertDb(context.env));
@@ -47,7 +48,8 @@ function handleGet(context) {
 
 function handlePost(context) {
   return withApiErrorHandling(async () => {
-    const session = await requireSession(context);
+    assertSameOrigin(context.request);
+    const session = await requireBudinesAccess(context);
     const body = await readJsonBody(context.request);
     const repo = createD1Repository(assertDb(context.env));
     const result = await createSale(repo, body, session.user);

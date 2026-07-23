@@ -9,17 +9,21 @@ const requiredFiles = [
   'README.md',
   'AGENTS.md',
   'migrations/0001_initial.sql',
+  'migrations/0003_password_auth.sql',
   'public/index.html',
   'public/styles.css',
   'public/manifest.webmanifest',
   'public/sw.js',
   'public/_headers',
   'functions/api/activate.js',
+  'functions/api/login.js',
+  'functions/api/register.js',
   'functions/api/session.js',
   'functions/api/logout.js',
   'functions/api/records/index.js',
   'functions/api/summary.js',
-  'functions/api/health.js'
+  'functions/api/health.js',
+  'scripts/seed-owners.mjs'
 ];
 
 const failures = [];
@@ -51,9 +55,11 @@ const localStorageAllowed = new Set([
   'public\\js\\truco.js',
   'public\\js\\metronome.js',
   'public\\js\\metronome-editor.js',
+  'public\\js\\local-storage.js',
   'public/js/truco.js',
   'public/js/metronome.js',
-  'public/js/metronome-editor.js'
+  'public/js/metronome-editor.js',
+  'public/js/local-storage.js'
 ]);
 for (const file of frontendFiles) {
   const content = readFileSync(file, 'utf8');
