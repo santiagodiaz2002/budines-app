@@ -17,7 +17,7 @@ import {
 import { createAudioCoordinator } from './audio-coordinator.js';
 import { initMetronome } from './metronome-editor.js?v=metronome-continuous-20260716';
 import { initToolNavigation } from './navigation.js';
-import { initTruco } from './truco.js?v=metronome-fix-20260716c';
+import { initTruco } from './truco.js?v=truco-visual-selector-20260723';
 import { initTuner } from './tuner.js';
 import { parsePositiveIntegerText, validateSaleFields } from './validation.js';
 

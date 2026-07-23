@@ -516,7 +516,7 @@ body[data-active-tool="truco"] #truco-tool {
 }
 
 #truco-tool {
-  --truco-rail: clamp(38px, 12vw, 56px);
+  --truco-rail: clamp(44px, 12vw, 56px);
   --truco-gap: clamp(3px, 1.2vw, 8px);
   --truco-pad: clamp(5px, 1.8vw, 10px);
   --stick-slot-w: clamp(26px, 8vw, 42px);
@@ -527,6 +527,14 @@ body[data-active-tool="truco"] #truco-tool {
   --stick-y-offset: clamp(8px, 2.4vw, 13px);
   min-height: 0;
   color: #fff4da;
+}
+
+#truco-tool[data-truco-visual-model="joint"] {
+  --stick-thick: clamp(10px, 3vw, 16px);
+}
+
+#truco-tool[data-truco-visual-model="smoke"] {
+  --stick-thick: clamp(8px, 2.5vw, 14px);
 }
 
 .truco-shell {
@@ -548,8 +556,11 @@ body[data-active-tool="truco"] #truco-tool {
 .truco-header {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "heading actions"
+    "visual actions";
   align-items: center;
-  gap: 8px;
+  gap: 5px 8px;
   min-height: 44px;
 }
 
@@ -557,6 +568,11 @@ body[data-active-tool="truco"] #truco-tool {
 .truco-header p,
 .truco-actions {
   margin: 0;
+}
+
+.truco-heading {
+  grid-area: heading;
+  min-width: 0;
 }
 
 .truco-header h2 {
@@ -572,8 +588,63 @@ body[data-active-tool="truco"] #truco-tool {
   font-size: clamp(0.6rem, 2.2vw, 0.72rem);
 }
 
+.truco-visual-toggle {
+  display: grid;
+  grid-area: visual;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: min(128px, 100%);
+  min-height: 36px;
+  padding: 3px;
+  border: 1px solid rgba(213, 166, 66, 0.44);
+  border-radius: 8px;
+  background: rgba(10, 7, 5, 0.72);
+  box-shadow: inset 0 0 0 1px rgba(255, 247, 226, 0.06);
+}
+
+.truco-visual-option {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  min-height: 30px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #d8c5a4;
+  font-size: clamp(0.68rem, 2.55vw, 0.78rem);
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.truco-visual-option::before {
+  content: "";
+  position: absolute;
+  inset: 5px auto 5px 5px;
+  width: 3px;
+  border-radius: 999px;
+  background: #17120c;
+  opacity: 0;
+}
+
+.truco-visual-option[aria-pressed="true"] {
+  background: linear-gradient(180deg, #f4c95d, #d5a642);
+  color: #17120c;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.38), 0 4px 10px rgba(0, 0, 0, 0.24);
+}
+
+.truco-visual-option[aria-pressed="true"]::before {
+  opacity: 1;
+}
+
+.truco-visual-option:focus-visible {
+  outline: 2px solid #fff7e6;
+  outline-offset: 2px;
+}
+
 .truco-actions {
   display: flex;
+  grid-area: actions;
   align-items: center;
   gap: 6px;
 }
@@ -604,6 +675,7 @@ body[data-active-tool="truco"] #truco-tool {
   grid-template-columns: var(--truco-rail) minmax(0, 1fr) 2px minmax(0, 1fr) var(--truco-rail);
   gap: var(--truco-gap);
   min-height: 0;
+  touch-action: manipulation;
 }
 
 .score-rail {

@@ -7,9 +7,13 @@ import {
   createBoardGroups,
   createDefaultTrucoState,
   createStickPattern,
+  DEFAULT_TRUCO_VISUAL_MODEL,
   getTrucoWinner,
   initTruco,
   sanitizeTrucoState,
+  sanitizeTrucoVisualModel,
+  TRUCO_VISUAL_MODELS,
+  TRUCO_VISUAL_STORAGE_KEY,
   undoScoreChange
 } from '../public/js/truco.js';
 
@@ -59,7 +63,106 @@ describe('Truco a 30', () => {
     expect(stored.scores.nosotros).toBe(1);
   });
 
-  it('renderiza los palitos con el smoke limpio y decorativo', () => {
+  it('usa Joint como modelo predeterminado y marca aria-pressed', () => {
+    setupDom();
+    initTruco();
+
+    addPoints('nosotros', 5);
+
+    expect(sanitizeTrucoVisualModel('humo-raro')).toBe(DEFAULT_TRUCO_VISUAL_MODEL);
+    expect(document.querySelector('#truco-tool').dataset.trucoVisualModel).toBe('joint');
+    expect(visualButton('joint').getAttribute('aria-pressed')).toBe('true');
+    expect(visualButton('smoke').getAttribute('aria-pressed')).toBe('false');
+    expect(allTallyImages('nosotros').every((image) => image.getAttribute('src') === TRUCO_VISUAL_MODELS.joint.src)).toBe(
+      true
+    );
+  });
+
+  it('seleccionar Smoke y Joint actualiza puntos visibles sin alterar puntaje ni historial', () => {
+    setupDom();
+    initTruco();
+
+    addPoints('nosotros', 18);
+    addPoints('ellos', 12);
+    visualButton('smoke').click();
+
+    expect(scoreText('nosotros')).toBe('18');
+    expect(scoreText('ellos')).toBe('12');
+    expect(window.localStorage.getItem(TRUCO_VISUAL_STORAGE_KEY)).toBe('smoke');
+    expect(visualButton('smoke').getAttribute('aria-pressed')).toBe('true');
+    expect(allTallyImages('nosotros').every((image) => image.getAttribute('src') === TRUCO_VISUAL_MODELS.smoke.src)).toBe(
+      true
+    );
+    expect(allTallyImages('ellos').every((image) => image.getAttribute('src') === TRUCO_VISUAL_MODELS.smoke.src)).toBe(
+      true
+    );
+
+    visualButton('joint').click();
+
+    expect(scoreText('nosotros')).toBe('18');
+    expect(scoreText('ellos')).toBe('12');
+    expect(window.localStorage.getItem(TRUCO_VISUAL_STORAGE_KEY)).toBe('joint');
+    expect(visualButton('joint').getAttribute('aria-pressed')).toBe('true');
+    expect(allTallyImages('nosotros').every((image) => image.getAttribute('src') === TRUCO_VISUAL_MODELS.joint.src)).toBe(
+      true
+    );
+
+    document.querySelector('#truco-undo').click();
+
+    expect(scoreText('nosotros')).toBe('18');
+    expect(scoreText('ellos')).toBe('11');
+    expect(document.querySelector('#truco-tool').dataset.trucoVisualModel).toBe('joint');
+  });
+
+  it('restaura la preferencia visual al recargar y valida valores corruptos', () => {
+    setupDom();
+    initTruco();
+    visualButton('smoke').click();
+    const storedVisualModel = window.localStorage.getItem(TRUCO_VISUAL_STORAGE_KEY);
+
+    windowRef.close();
+    setupDom({ visualModel: storedVisualModel });
+    initTruco();
+
+    expect(document.querySelector('#truco-tool').dataset.trucoVisualModel).toBe('smoke');
+    expect(visualButton('smoke').getAttribute('aria-pressed')).toBe('true');
+
+    windowRef.close();
+    setupDom({ visualModel: 'ceniza' });
+    initTruco();
+
+    expect(document.querySelector('#truco-tool').dataset.trucoVisualModel).toBe('joint');
+    expect(visualButton('joint').getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('el swipe horizontal cambia modelo y el movimiento vertical o controles no lo disparan', () => {
+    setupDom();
+    initTruco();
+
+    addPoints('nosotros', 5);
+    dispatchSwipe(board(), { startX: 230, startY: 180, endX: 120, endY: 188 });
+
+    expect(document.querySelector('#truco-tool').dataset.trucoVisualModel).toBe('smoke');
+    expect(scoreText('nosotros')).toBe('5');
+    expect(allTallyImages('nosotros').every((image) => image.getAttribute('src') === TRUCO_VISUAL_MODELS.smoke.src)).toBe(
+      true
+    );
+
+    dispatchSwipe(board(), { startX: 120, startY: 180, endX: 230, endY: 187 });
+    expect(document.querySelector('#truco-tool').dataset.trucoVisualModel).toBe('joint');
+
+    dispatchSwipe(board(), { startX: 160, startY: 120, endX: 170, endY: 260 });
+    expect(document.querySelector('#truco-tool').dataset.trucoVisualModel).toBe('joint');
+
+    const plus = document.querySelector('[data-truco-team-target="nosotros"][data-truco-action="add"]');
+    dispatchSwipe(plus, { startX: 230, startY: 180, endX: 110, endY: 186 });
+    plus.click();
+
+    expect(document.querySelector('#truco-tool').dataset.trucoVisualModel).toBe('joint');
+    expect(scoreText('nosotros')).toBe('6');
+  });
+
+  it('renderiza los palitos con el asset activo limpio y decorativo', () => {
     setupDom();
     initTruco();
 
@@ -76,7 +179,7 @@ describe('Truco a 30', () => {
     expect(base).toHaveLength(4);
     expect(diagonal).toHaveLength(1);
     expect(positions).toEqual(['left', 'top', 'right', 'bottom']);
-    expect([...images].every((image) => image.getAttribute('src') === '/media/smoke.png')).toBe(true);
+    expect([...images].every((image) => image.getAttribute('src') === TRUCO_VISUAL_MODELS.joint.src)).toBe(true);
     expect([...images].every((image) => image.getAttribute('alt') === '')).toBe(true);
   });
 
@@ -124,7 +227,7 @@ describe('Truco a 30', () => {
     [15, [5, 5, 5, 0, 0, 0]],
     [16, [5, 5, 5, 1, 0, 0]],
     [30, [5, 5, 5, 5, 5, 5]]
-  ])('renderiza %i puntos con imagenes reales de smoke', (score, expectedGroups) => {
+  ])('renderiza %i puntos con imagenes reales de Joint por defecto', (score, expectedGroups) => {
     setupDom();
     initTruco();
 
@@ -132,10 +235,12 @@ describe('Truco a 30', () => {
 
     expect(imageCount('nosotros')).toBe(score);
     expect(groupImageCounts('nosotros')).toEqual(expectedGroups);
-    expect(allTallyImages('nosotros').every((image) => image.getAttribute('src') === '/media/smoke.png')).toBe(true);
+    expect(allTallyImages('nosotros').every((image) => image.getAttribute('src') === TRUCO_VISUAL_MODELS.joint.src)).toBe(
+      true
+    );
   });
 
-  it('cada grupo completo tiene cuatro smokes base y uno diagonal', () => {
+  it('cada grupo completo tiene cuatro elementos base y uno diagonal', () => {
     setupDom();
     initTruco();
 
@@ -153,12 +258,16 @@ describe('Truco a 30', () => {
     }
   });
 
-  it('restar y deshacer actualizan las imagenes de smoke', () => {
+  it('restar y deshacer actualizan las imagenes del modelo activo', () => {
     setupDom();
     initTruco();
+    visualButton('smoke').click();
 
     addPoints('nosotros', 3);
     expect(imageCount('nosotros')).toBe(3);
+    expect(allTallyImages('nosotros').every((image) => image.getAttribute('src') === TRUCO_VISUAL_MODELS.smoke.src)).toBe(
+      true
+    );
 
     document.querySelector('[data-truco-team-target="nosotros"][data-truco-action="subtract"]').click();
     expect(imageCount('nosotros')).toBe(2);
@@ -168,6 +277,9 @@ describe('Truco a 30', () => {
 
     document.querySelector('#truco-undo').click();
     expect(imageCount('nosotros')).toBe(2);
+    expect(allTallyImages('nosotros').every((image) => image.getAttribute('src') === TRUCO_VISUAL_MODELS.smoke.src)).toBe(
+      true
+    );
   });
 
   it('Nosotros y Ellos mantienen imagenes independientes', () => {
@@ -258,16 +370,19 @@ describe('Truco a 30', () => {
     expect(state.history).toEqual([]);
   });
 
-  it('el asset derivado de smoke conserva transparencia', async () => {
-    const metadata = await sharp('public/media/smoke.png').metadata();
+  it.each([
+    [TRUCO_VISUAL_MODELS.joint.label, `public${TRUCO_VISUAL_MODELS.joint.src}`],
+    [TRUCO_VISUAL_MODELS.smoke.label, `public${TRUCO_VISUAL_MODELS.smoke.src}`]
+  ])('el asset real de %s conserva transparencia', async (_label, file) => {
+    const metadata = await sharp(file).metadata();
 
-    expect(existsSync('public/media/smoke.png')).toBe(true);
+    expect(existsSync(file)).toBe(true);
     expect(metadata.format).toBe('png');
     expect(metadata.hasAlpha).toBe(true);
     expect(metadata.width).toBeGreaterThan(450);
     expect(metadata.height).toBeGreaterThan(50);
 
-    const { data, info } = await sharp('public/media/smoke.png').ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    const { data, info } = await sharp(file).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
     const alphaAt = (x, y) => data[(y * info.width + x) * 4 + 3];
     expect([
       alphaAt(0, 0),
@@ -298,11 +413,44 @@ function groupImageCounts(team) {
   );
 }
 
-function setupDom() {
+function board() {
+  return document.querySelector('[data-truco-board]');
+}
+
+function dispatchSwipe(target, { startX, startY, endX, endY }) {
+  dispatchPointer(target, 'pointerdown', startX, startY);
+  dispatchPointer(target, 'pointermove', endX, endY);
+  dispatchPointer(target, 'pointerup', endX, endY);
+}
+
+function dispatchPointer(target, type, clientX, clientY) {
+  const event = new window.Event(type, { bubbles: true, cancelable: true });
+  Object.assign(event, {
+    clientX,
+    clientY,
+    isPrimary: true,
+    pointerId: 1,
+    pointerType: 'touch'
+  });
+  target.dispatchEvent(event);
+}
+
+function scoreText(team) {
+  return document.querySelector(`[data-truco-team="${team}"] [data-truco-score]`).textContent;
+}
+
+function visualButton(model) {
+  return document.querySelector(`[data-truco-visual="${model}"]`);
+}
+
+function setupDom({ visualModel } = {}) {
   const html = readFileSync('public/index.html', 'utf8');
   windowRef = new Window({ url: 'https://budines.test/' });
   windowRef.document.write(html);
   windowRef.document.close();
+  if (visualModel !== undefined) {
+    windowRef.localStorage.setItem(TRUCO_VISUAL_STORAGE_KEY, visualModel);
+  }
   vi.stubGlobal('window', windowRef);
   vi.stubGlobal('document', windowRef.document);
   vi.stubGlobal('localStorage', windowRef.localStorage);
