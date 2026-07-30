@@ -1,13 +1,15 @@
 {
   "name": "Budines",
   "short_name": "Budines",
-  "description": "Registro compartido privado de Budines.",
+  "description": "Budines y herramientas compartidas de Luz en Ruinas.",
+  "lang": "es-AR",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "orientation": "portrait",
-  "background_color": "#000000",
-  "theme_color": "#000000",
+  "orientation": "any",
+  "background_color": "#05070c",
+  "theme_color": "#05070c",
+  "categories": ["music", "utilities"],
   "icons": [
     {
       "src": "/icons/favicon-16.png",

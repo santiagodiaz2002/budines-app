@@ -56,13 +56,14 @@ export async function onRequest(context) {
               password_salt,
               password_algorithm,
               password_iterations,
+              password_kdf_version,
               role,
               can_access_budines,
               created_at,
               updated_at,
               disabled_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, NULL)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 2, ?, 0, ?, ?, NULL)
           `
         )
         .bind(

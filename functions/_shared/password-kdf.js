@@ -5,7 +5,6 @@ export async function derivePbkdf2PasswordHash(cryptoImpl, passwordBytes, saltHe
   const salt = hexToBytes(saltHex);
   let material = new Uint8Array(passwordBytes);
 
-  // Cloudflare Workers caps one PBKDF2 deriveBits call at 100000 iterations.
   for (const chunkIterations of splitPbkdf2Iterations(iterations)) {
     const key = await cryptoImpl.subtle.importKey('raw', material, 'PBKDF2', false, ['deriveBits']);
     const bits = await cryptoImpl.subtle.deriveBits(
@@ -22,6 +21,10 @@ export async function derivePbkdf2PasswordHash(cryptoImpl, passwordBytes, saltHe
   }
 
   return bytesToHex(material);
+}
+
+export async function deriveLegacyPasswordHash(cryptoImpl, passwordBytes, saltHex, iterations) {
+  return derivePbkdf2PasswordHash(cryptoImpl, passwordBytes, saltHex, iterations);
 }
 
 export function splitPbkdf2Iterations(iterations) {

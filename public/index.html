@@ -3,47 +3,57 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="theme-color" content="#000000">
-    <meta name="background-color" content="#000000">
+    <meta name="theme-color" content="#05070c">
+    <meta name="background-color" content="#05070c">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Budines">
-    <meta name="color-scheme" content="dark light">
+    <meta name="color-scheme" content="dark">
     <title>Budines</title>
     <link rel="preload" href="/branding/logo-luz-en-ruinas.png" as="image">
-    <link rel="preload" href="/media/joint-clean.png" as="image">
-    <link rel="preload" href="/media/smoke.png" as="image">
     <link rel="manifest" href="/manifest.webmanifest">
     <link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
     <link rel="icon" href="/icons/favicon-16.png" sizes="16x16" type="image/png">
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
-    <link rel="stylesheet" href="/styles.css?v=quantity-20260723">
+    <link rel="stylesheet" href="/styles.css?v=redesign13-20260730">
   </head>
   <body data-auth-state="booting">
+    <a class="skip-link" href="#main-content">Saltar al contenido</a>
     <div class="boot-brand" aria-hidden="true">
       <img src="/branding/logo-luz-en-ruinas.png" alt="">
     </div>
     <div class="shell">
       <header class="topbar">
         <div class="brand-lockup">
-          <img class="brand-logo brand-logo--header" src="/branding/logo-luz-en-ruinas.png" alt="Luz en Ruinas" width="1448" height="1086">
-          <div>
-            <p class="eyebrow">Budines</p>
-            <h1>Registro compartido</h1>
+          <span class="brand-mark">
+            <img class="brand-logo brand-logo--header" src="/branding/logo-luz-en-ruinas.png" alt="Luz en Ruinas" width="1448" height="1086">
+          </span>
+          <div class="brand-copy">
+            <p class="eyebrow">Luz en Ruinas</p>
+            <h1>Budines</h1>
           </div>
         </div>
         <div id="user-session" class="session-area" hidden>
           <p id="session-badge" class="session-badge"></p>
-          <button id="logout-button" class="quiet-button quiet-button--compact" type="button">Cerrar sesión</button>
+          <button id="logout-button" class="quiet-button quiet-button--compact" type="button" aria-label="Cerrar sesión">
+            <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M10 5H6.8A1.8 1.8 0 0 0 5 6.8v10.4A1.8 1.8 0 0 0 6.8 19H10M14 8l4 4-4 4M18 12H9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span>Salir</span>
+          </button>
         </div>
       </header>
 
-      <main id="main-content">
+      <main id="main-content" tabindex="-1">
         <section id="auth-view" class="panel auth-panel" aria-labelledby="auth-title" hidden>
-          <img class="brand-logo brand-logo--auth" src="/branding/logo-luz-en-ruinas.png" alt="Luz en Ruinas" width="1448" height="1086">
-          <div class="panel-heading">
-            <p class="eyebrow">Budines</p>
-            <h2 id="auth-title">Ingresá a la app</h2>
+          <div class="auth-brand">
+            <img class="brand-logo brand-logo--auth" src="/branding/logo-luz-en-ruinas.png" alt="Luz en Ruinas" width="1448" height="1086">
+            <span class="auth-brand-line" aria-hidden="true"></span>
+          </div>
+          <div class="panel-heading auth-heading">
+            <p class="eyebrow">Budines · Herramientas compartidas</p>
+            <h1 id="auth-title">Ingresá a la app</h1>
+            <p class="heading-copy">Tu espacio cotidiano para registrar, jugar y hacer música.</p>
           </div>
 
           <div class="auth-mode-switcher" role="group" aria-label="Acceso">
@@ -67,13 +77,14 @@
                 maxlength="30"
                 pattern="[A-Za-z0-9._-]{3,30}"
                 enterkeyhint="next"
+                placeholder="Tu usuario"
                 required
               >
             </label>
 
-            <label class="field auth-field">
-              <span>Contraseña</span>
-              <span class="password-control">
+            <div class="field auth-field">
+              <label for="auth-password">Contraseña</label>
+              <div class="password-control">
                 <input
                   id="auth-password"
                   name="password"
@@ -85,36 +96,69 @@
                   minlength="8"
                   maxlength="1024"
                   enterkeyhint="go"
+                  placeholder="Tu contraseña"
                   required
                 >
                 <button id="auth-password-toggle" class="quiet-button password-toggle" type="button" aria-pressed="false">Mostrar</button>
-              </span>
-            </label>
+              </div>
+            </div>
 
             <p id="auth-message" class="form-message" role="status"></p>
             <button id="auth-submit" class="primary-button" type="submit">Iniciar sesión</button>
           </form>
+          <p class="auth-footnote">Las herramientas musicales funcionan en este dispositivo.</p>
         </section>
 
         <section id="budines-tool" class="tool-panel" data-tool-panel="budines" role="tabpanel" aria-labelledby="tab-budines" hidden>
           <section id="app-view">
             <section id="summary-card" class="summary-card" aria-live="polite">
-              <p class="eyebrow">Total acumulado</p>
+              <div class="summary-head">
+                <div>
+                  <p class="eyebrow">Capital compartido</p>
+                  <p class="summary-label">Total acumulado</p>
+                </div>
+                <span class="summary-currency">ARS</span>
+              </div>
               <p id="summary-total" class="summary-total">$ 0</p>
+              <div class="summary-progress-block">
+                <div class="summary-progress-copy">
+                  <span>Recuperación de la inversión</span>
+                  <strong id="summary-progress-label">0%</strong>
+                </div>
+                <div
+                  id="summary-progress"
+                  class="summary-progress"
+                  role="progressbar"
+                  aria-label="Recuperación de la inversión"
+                  aria-valuemin="0"
+                  aria-valuemax="100"
+                  aria-valuenow="0"
+                >
+                  <span id="summary-progress-fill"></span>
+                </div>
+              </div>
               <div id="summary-lines" class="summary-lines"></div>
             </section>
 
-            <nav class="view-switcher" aria-label="Secciones">
-              <button id="show-entry" class="switch-button is-active" type="button">Carga</button>
-              <button id="show-records" class="switch-button" type="button">Registros</button>
+            <nav class="view-switcher" aria-label="Secciones de Budines" aria-orientation="horizontal" role="tablist">
+              <button id="show-entry" class="switch-button is-active" type="button" role="tab" aria-selected="true" aria-controls="entry-section">
+                <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                <span>Carga</span>
+              </button>
+              <button id="show-records" class="switch-button" type="button" role="tab" aria-selected="false" aria-controls="records-section" tabindex="-1">
+                <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10M7 12h10M7 17h7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                <span>Registros</span>
+              </button>
             </nav>
 
-            <section id="entry-section" class="panel">
+            <section id="entry-section" class="panel" role="tabpanel" aria-labelledby="show-entry">
               <div class="panel-heading row-heading">
                 <div>
                   <p class="eyebrow">Nueva operación</p>
                   <h2>Registrar venta</h2>
+                  <p class="heading-copy">Cargá cantidad e importe. El usuario se toma de tu sesión.</p>
                 </div>
+                <span class="status-pill status-pill--neutral">GR / AP</span>
               </div>
 
               <form id="sale-form" class="stack" novalidate>
@@ -149,37 +193,44 @@
                       >AP</button>
                     </div>
                   </div>
+                  <small class="field-help">Elegí gramos o AP antes de guardar.</small>
                 </div>
 
                 <label class="field">
-                  <span>Importe total</span>
-                  <input
-                    id="amount-input"
-                    name="amountArs"
-                    type="text"
-                    inputmode="numeric"
-                    pattern="[0-9]*"
-                    maxlength="12"
-                    autocomplete="off"
-                    required
-                  >
+                  <span>Importe total <small>ARS</small></span>
+                  <span class="input-shell input-shell--currency">
+                    <span class="input-prefix" aria-hidden="true">$</span>
+                    <input
+                      id="amount-input"
+                      name="amountArs"
+                      type="text"
+                      inputmode="numeric"
+                      pattern="[0-9]*"
+                      maxlength="12"
+                      autocomplete="off"
+                      required
+                    >
+                  </span>
                 </label>
 
                 <p id="amount-preview" class="input-preview" aria-live="polite"></p>
                 <p id="sale-error" class="form-message" role="status"></p>
-                <button id="sale-submit" class="primary-button" type="submit">Registrar</button>
+                <button id="sale-submit" class="primary-button" type="submit">Guardar venta</button>
               </form>
             </section>
 
-            <section id="records-section" class="panel records-panel" hidden>
+            <section id="records-section" class="panel records-panel" role="tabpanel" aria-labelledby="show-records" hidden>
               <div class="panel-heading row-heading">
                 <div>
                   <p class="eyebrow">Historial</p>
                   <h2>Registros</h2>
+                  <p class="heading-copy">Abrí un registro para revisar sus datos o darlo de baja.</p>
                 </div>
                 <div class="records-heading-side">
-                  <img class="brand-logo brand-logo--records" src="/branding/logo-luz-en-ruinas.png" alt="Luz en Ruinas" width="1448" height="1086">
-                  <button id="reload-records" class="quiet-button" type="button">Recargar</button>
+                  <button id="reload-records" class="quiet-button" type="button">
+                    <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 8a7 7 0 1 0 1 5M19 4v4h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    <span>Recargar</span>
+                  </button>
                 </div>
               </div>
 
@@ -216,7 +267,10 @@
 
               <article class="team-field team-field--nosotros" data-truco-team="nosotros">
                 <header class="team-field-head">
-                  <h3>Nosotros</h3>
+                  <div class="team-name">
+                    <span class="team-symbol" aria-hidden="true">N</span>
+                    <h3>Nosotros</h3>
+                  </div>
                   <p><span data-truco-score>0</span><span class="sr-only"> puntos</span></p>
                 </header>
                 <section class="fifteen-section" aria-label="Nosotros malas">
@@ -242,7 +296,10 @@
 
               <article class="team-field team-field--ellos" data-truco-team="ellos">
                 <header class="team-field-head">
-                  <h3>Ellos</h3>
+                  <div class="team-name">
+                    <span class="team-symbol" aria-hidden="true">E</span>
+                    <h3>Ellos</h3>
+                  </div>
                   <p><span data-truco-score>0</span><span class="sr-only"> puntos</span></p>
                 </header>
                 <section class="fifteen-section" aria-label="Ellos malas">
@@ -278,47 +335,36 @@
               <div>
                 <p class="eyebrow">Metrónomo</p>
                 <h2>4/4 por bloques</h2>
+                <p class="heading-copy">Tempo, partes y anuncios sincronizados.</p>
               </div>
-              <button id="metronome-configure" class="quiet-button" type="button">Configurar</button>
+              <div class="heading-actions">
+                <span id="metronome-transport-state" class="status-pill status-pill--neutral">Detenido</span>
+                <button id="metronome-configure" class="quiet-button" type="button">Configurar</button>
+              </div>
             </div>
 
             <div class="metronome-display" aria-live="polite">
-              <div id="metronome-indicator" class="pulse-indicator" aria-hidden="true"></div>
-              <div class="metronome-announcer">
-                <p id="metronome-announcement">Próximo: Intro</p>
-                <strong id="metronome-count">Listo</strong>
-                <span>BPM entrante <b id="metronome-incoming-bpm">100</b></span>
+              <div class="metronome-stage">
+                <div class="metronome-tempo">
+                  <div id="metronome-indicator" class="pulse-indicator" aria-hidden="true"></div>
+                  <span>Tempo actual</span>
+                  <strong id="metronome-bpm-now">100</strong>
+                  <small>BPM</small>
+                </div>
+                <div class="metronome-announcer">
+                  <p id="metronome-announcement">Próximo: Intro</p>
+                  <strong id="metronome-count">Listo</strong>
+                  <span>Próximo tempo <b id="metronome-incoming-bpm">100</b> BPM</span>
+                </div>
               </div>
-              <dl class="metrics-grid">
-                <div>
-                  <dt>Canción</dt>
-                  <dd id="metronome-song-now">Sin guardar</dd>
-                </div>
-                <div>
-                  <dt>Parte</dt>
-                  <dd id="metronome-part-now">Intro</dd>
-                </div>
-                <div>
-                  <dt>Pulso</dt>
-                  <dd id="metronome-pulse">1/4</dd>
-                </div>
-                <div>
-                  <dt>Compás</dt>
-                  <dd id="metronome-measure">1/4</dd>
-                </div>
-                <div>
-                  <dt>Bloque</dt>
-                  <dd id="metronome-block">1/1</dd>
-                </div>
-                <div>
-                  <dt>BPM actual</dt>
-                  <dd id="metronome-bpm-now">100</dd>
-                </div>
-                <div>
-                  <dt>Siguiente</dt>
-                  <dd id="metronome-next-part">Verso</dd>
-                </div>
-              </dl>
+            </div>
+
+            <div class="button-grid transport-controls">
+              <button id="metronome-start" class="primary-button" type="button">Iniciar</button>
+              <button id="metronome-pause" class="secondary-button" type="button">Pausar</button>
+              <button id="metronome-stop" class="quiet-button" type="button">Stop</button>
+              <button id="metronome-restart" class="quiet-button" type="button">Reiniciar</button>
+              <button id="metronome-tap" class="quiet-button" type="button">Tap Tempo</button>
             </div>
 
             <div class="tool-controls">
@@ -332,13 +378,32 @@
               </label>
             </div>
 
-            <div class="button-grid">
-              <button id="metronome-start" class="primary-button" type="button">Iniciar</button>
-              <button id="metronome-pause" class="secondary-button" type="button">Pausar</button>
-              <button id="metronome-stop" class="quiet-button" type="button">Stop</button>
-              <button id="metronome-restart" class="quiet-button" type="button">Reiniciar</button>
-              <button id="metronome-tap" class="quiet-button" type="button">Tap Tempo</button>
-            </div>
+            <dl class="metrics-grid metrics-grid--metronome">
+              <div>
+                <dt>Canción</dt>
+                <dd id="metronome-song-now">Sin guardar</dd>
+              </div>
+              <div>
+                <dt>Parte</dt>
+                <dd id="metronome-part-now">Intro</dd>
+              </div>
+              <div>
+                <dt>Pulso</dt>
+                <dd id="metronome-pulse">1/4</dd>
+              </div>
+              <div>
+                <dt>Compás</dt>
+                <dd id="metronome-measure">1/4</dd>
+              </div>
+              <div>
+                <dt>Bloque</dt>
+                <dd id="metronome-block">1/1</dd>
+              </div>
+              <div class="metric-next">
+                <dt>Siguiente</dt>
+                <dd id="metronome-next-part">Verso</dd>
+              </div>
+            </dl>
             <p id="metronome-status" class="tool-status" role="status"></p>
           </section>
 
@@ -347,6 +412,7 @@
               <div>
                 <p class="eyebrow">Editor</p>
                 <h2 id="metronome-editor-title">Canción actual</h2>
+                <p class="heading-copy">Guardá esta configuración o creá una copia.</p>
               </div>
               <span id="metronome-unsaved" class="status-pill" hidden>Cambios sin guardar</span>
             </div>
@@ -362,6 +428,7 @@
               <div>
                 <p class="eyebrow">Biblioteca</p>
                 <h2 id="metronome-library-title">Mis canciones</h2>
+                <p class="heading-copy">Tus canciones quedan en este dispositivo.</p>
               </div>
               <button id="metronome-new-song" class="quiet-button" type="button">Nueva canción</button>
             </div>
@@ -373,21 +440,35 @@
 
         <section id="tuner-tool" class="tool-panel" data-tool-panel="tuner" role="tabpanel" aria-labelledby="tab-tuner" hidden>
           <section class="panel tool-card">
-            <div class="panel-heading">
-              <p class="eyebrow">Afinador cromático</p>
-              <h2>Guitarra, bajo y alternativas</h2>
+            <div class="panel-heading row-heading">
+              <div>
+                <p class="eyebrow">Afinador cromático</p>
+                <h2>Lectura inmediata</h2>
+                <p class="heading-copy">Para guitarra, bajo y cualquier afinación.</p>
+              </div>
+              <span id="tuner-mic-state" class="status-pill status-pill--neutral">Mic apagado</span>
             </div>
 
+            <div class="button-grid two">
+              <button id="tuner-start" class="primary-button" type="button">Iniciar afinador</button>
+              <button id="tuner-stop" class="quiet-button" type="button" disabled>Detener afinador</button>
+            </div>
+            <p id="tuner-status" class="tool-status" role="status"></p>
+
             <div class="tuner-display" aria-live="polite">
-              <p id="tuner-reference" class="input-preview"></p>
+              <p id="tuner-reference" class="tuner-reference"></p>
               <div class="tuner-note">
                 <span id="tuner-note">A</span>
                 <small id="tuner-octave">4</small>
               </div>
               <p id="tuner-verdict" class="tuner-verdict">Detenido</p>
+              <p id="tuner-guidance" class="tuner-guidance">Iniciá el micrófono y tocá una nota.</p>
               <div class="tuner-meter" aria-hidden="true">
                 <span>Grave</span>
                 <div class="meter-track">
+                  <span class="meter-zone meter-zone--low"></span>
+                  <span class="meter-zone meter-zone--center"></span>
+                  <span class="meter-zone meter-zone--high"></span>
                   <div id="tuner-needle" class="meter-needle"></div>
                 </div>
                 <span>Agudo</span>
@@ -407,33 +488,27 @@
                 </div>
               </dl>
             </div>
-
-            <div class="button-grid two">
-              <button id="tuner-start" class="primary-button" type="button">Iniciar afinador</button>
-              <button id="tuner-stop" class="quiet-button" type="button" disabled>Detener afinador</button>
-            </div>
-            <p id="tuner-status" class="tool-status" role="status"></p>
           </section>
         </section>
       </main>
     </div>
 
-    <nav id="bottom-tabs" class="bottom-tabs" role="tablist" aria-label="Herramientas" hidden>
+    <nav id="bottom-tabs" class="bottom-tabs" role="tablist" aria-label="Herramientas" aria-orientation="horizontal" hidden>
       <button id="tab-budines" class="bottom-tab is-active" type="button" role="tab" aria-selected="true" aria-controls="budines-tool" data-tool-tab="budines">
-        <svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6.5h14M5 12h14M5 17.5h9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-        <span>Budines</span>
+        <svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 10.5c0-2.2 1.8-4 4-4h6c2.2 0 4 1.8 4 4v6.8c0 .7-.6 1.2-1.2 1.2H6.2c-.7 0-1.2-.6-1.2-1.2zM8 6.5V5m4 1.5V4.5m4 2V5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="tab-label">Budines</span>
       </button>
       <button id="tab-truco" class="bottom-tab" type="button" role="tab" aria-selected="false" aria-controls="truco-tool" data-tool-tab="truco">
-        <svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10v16H7zM10 8h4M10 12h4M10 16h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span>Truco</span>
+        <svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m8.4 5.2 7.7-1.4 2.2 12.4-7.7 1.4zM5.6 7.1h7.8v12.6H5.6zM8 10.2h3M8 13h3M8 15.8h2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="tab-label">Truco</span>
       </button>
       <button id="tab-metronome" class="bottom-tab" type="button" role="tab" aria-selected="false" aria-controls="metronome-tool" data-tool-tab="metronome">
-        <svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v4M12 12l4-4M5 19h14M7 19l3-11h4l3 11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span>Metrónomo</span>
+        <svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v4M12 12l4-4M5 19h14M7 19l3-11h4l3 11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="tab-label">Metrónomo</span>
       </button>
       <button id="tab-tuner" class="bottom-tab" type="button" role="tab" aria-selected="false" aria-controls="tuner-tool" data-tool-tab="tuner">
-        <svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h3l2-5 4 10 2-5h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span>Afinador</span>
+        <svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 12h3l1.8-4.5 3.4 9 2.2-6 1.7 3.2h4.9M12 4v2m0 12v2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="tab-label">Afinador</span>
       </button>
     </nav>
 
@@ -545,6 +620,6 @@
     </div>
 
     <p id="live-region" class="sr-only" aria-live="polite" aria-atomic="true"></p>
-    <script type="module" src="/js/app.js?v=quantity-20260723"></script>
+    <script type="module" src="/js/app.js?v=redesign13-20260730"></script>
   </body>
 </html>

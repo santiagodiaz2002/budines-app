@@ -135,6 +135,27 @@ describe('interfaz del metrónomo con canciones', () => {
     await waitFor(() => !songTitles().includes('Cancion Editada'));
     expect(songTitles()).toEqual(['Copia Renombrada']);
   });
+
+  it('restaura el foco al cancelar diálogos de nombre y confirmación', async () => {
+    await init();
+    await createSavedSong('Canción con foco', [{ name: 'Intro', measures: '1', bpm: '90' }]);
+    click('#metronome-cancel-blocks');
+    await waitFor(() => document.querySelector('#metronome-config-dialog').hidden);
+
+    const renameButton = songActionButton('Canción con foco', 'rename');
+    renameButton.focus();
+    click(renameButton);
+    await waitFor(() => !document.querySelector('#metronome-name-dialog').hidden);
+    click('#metronome-name-cancel');
+    expect(document.activeElement).toBe(renameButton);
+
+    const deleteButton = songActionButton('Canción con foco', 'delete');
+    deleteButton.focus();
+    click(deleteButton);
+    await waitFor(() => !document.querySelector('#metronome-confirm-dialog').hidden);
+    document.dispatchEvent(new windowRef.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(document.activeElement).toBe(deleteButton);
+  });
 });
 
 async function init() {
@@ -259,11 +280,15 @@ async function createSavedSong(name, parts) {
 }
 
 function clickSongAction(title, action) {
+  click(songActionButton(title, action));
+}
+
+function songActionButton(title, action) {
   const card = [...document.querySelectorAll('.song-card')].find((item) => item.querySelector('.song-card-title')?.textContent === title);
   if (!card) {
     throw new Error(`Missing song card ${title}`);
   }
-  click(card.querySelector(`[data-song-action="${action}"]`));
+  return card.querySelector(`[data-song-action="${action}"]`);
 }
 
 function submitNameDialog(value) {

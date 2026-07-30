@@ -33,6 +33,9 @@ describe('pantalla de acceso y permisos de UI', () => {
 
     expect(document.body.dataset.authState).toBe('auth');
     expect(document.querySelector('#bottom-tabs').hidden).toBe(true);
+    expect(document.querySelector('#auth-title').tagName).toBe('H1');
+    expect(document.querySelector('.skip-link').getAttribute('href')).toBe('#main-content');
+    expect(document.querySelector('#main-content').tabIndex).toBe(-1);
     expect(inputs).toEqual(['username', 'password']);
     expect(document.querySelector('#auth-username').autocomplete).toBe('username');
     expect(document.querySelector('#auth-password').autocomplete).toBe('current-password');

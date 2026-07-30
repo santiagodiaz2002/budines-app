@@ -78,6 +78,57 @@ afterEach(() => {
 });
 
 describe('interfaz de carga de Budines', () => {
+  it('navega los subtabs con flechas, Home y End', async () => {
+    const entryTab = document.querySelector('#show-entry');
+    const recordsTab = document.querySelector('#show-records');
+    const entrySection = document.querySelector('#entry-section');
+    const recordsSection = document.querySelector('#records-section');
+
+    recordsTab.focus();
+    recordsTab.dispatchEvent(new windowRef.KeyboardEvent('keydown', {
+      key: 'ArrowLeft',
+      bubbles: true,
+      cancelable: true
+    }));
+
+    expect(entryTab.getAttribute('aria-selected')).toBe('true');
+    expect(recordsTab.getAttribute('aria-selected')).toBe('false');
+    expect(entryTab.tabIndex).toBe(0);
+    expect(recordsTab.tabIndex).toBe(-1);
+    expect(entrySection.hidden).toBe(false);
+    expect(recordsSection.hidden).toBe(true);
+    expect(document.activeElement).toBe(entryTab);
+
+    entryTab.dispatchEvent(new windowRef.KeyboardEvent('keydown', {
+      key: 'ArrowRight',
+      bubbles: true,
+      cancelable: true
+    }));
+
+    expect(recordsTab.getAttribute('aria-selected')).toBe('true');
+    expect(recordsSection.hidden).toBe(false);
+    expect(document.activeElement).toBe(recordsTab);
+
+    recordsTab.dispatchEvent(new windowRef.KeyboardEvent('keydown', {
+      key: 'Home',
+      bubbles: true,
+      cancelable: true
+    }));
+
+    expect(entryTab.getAttribute('aria-selected')).toBe('true');
+    expect(document.activeElement).toBe(entryTab);
+
+    entryTab.dispatchEvent(new windowRef.KeyboardEvent('keydown', {
+      key: 'End',
+      bubbles: true,
+      cancelable: true
+    }));
+
+    expect(recordsTab.getAttribute('aria-selected')).toBe('true');
+    expect(document.activeElement).toBe(recordsTab);
+    await waitFor(() => document.querySelectorAll('[data-record-card]').length === records.length);
+  });
+
   it('usa GR como unidad inicial y permite guardar GR', async () => {
     document.querySelector('#show-entry').click();
 

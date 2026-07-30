@@ -3,7 +3,11 @@ import { DatabaseSync } from 'node:sqlite';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { hashPassword, getCurrentSession, requireBudinesAccess, requireSession } from '../functions/_shared/auth.js';
 import { PASSWORD_ITERATIONS, PBKDF2_MAX_ITERATIONS_PER_DERIVE } from '../functions/_shared/constants.js';
-import { splitPbkdf2Iterations } from '../functions/_shared/password-kdf.js';
+import {
+  deriveLegacyPasswordHash,
+  derivePbkdf2PasswordHash,
+  splitPbkdf2Iterations
+} from '../functions/_shared/password-kdf.js';
 import { onRequest as loginEndpoint } from '../functions/api/login.js';
 import { onRequest as logoutEndpoint } from '../functions/api/logout.js';
 import { onRequest as recordsEndpoint } from '../functions/api/records/index.js';
@@ -38,7 +42,7 @@ afterAll(() => {
 });
 
 describe('autenticación por usuario y contraseña', () => {
-  it('divide PBKDF2 en llamadas compatibles con el límite de Cloudflare Workers', () => {
+  it('aplica 600.000 iteraciones PBKDF2 en bloques compatibles con Cloudflare', () => {
     const chunks = splitPbkdf2Iterations(PASSWORD_ITERATIONS);
 
     expect(chunks.reduce((total, chunk) => total + chunk, 0)).toBe(PASSWORD_ITERATIONS);
@@ -146,6 +150,56 @@ describe('autenticación por usuario y contraseña', () => {
     expect(wrongPassword.status).toBe(401);
     expect(missingUser.status).toBe(401);
     expect(wrongBody.error.message).toBe(missingBody.error.message);
+  });
+
+  it('actualiza un hash legado al formato vigente después de un login válido', async () => {
+    const { d1, db } = createTestD1();
+    const password = 'legacy-test-password';
+    const saltHex = '7a'.repeat(32);
+    const legacyHash = await deriveLegacyPasswordHash(
+      globalThis.crypto,
+      new TextEncoder().encode(password),
+      saltHex,
+      PASSWORD_ITERATIONS
+    );
+    const now = new Date().toISOString();
+
+    db.prepare(
+      `
+        INSERT INTO app_users (
+          id,
+          username_normalized,
+          display_name,
+          password_hash,
+          password_salt,
+          password_algorithm,
+          password_iterations,
+          password_kdf_version,
+          role,
+          can_access_budines,
+          created_at,
+          updated_at,
+          disabled_at
+        )
+        VALUES (?, ?, ?, ?, ?, 'PBKDF2-HMAC-SHA-256', ?, 1, 'common', 0, ?, ?, NULL)
+      `
+    ).run('legacy-user', 'legacy-user', 'Legacy-User', legacyHash, saltHex, PASSWORD_ITERATIONS, now, now);
+
+    const response = await loginUser(d1, { username: 'LEGACY-USER', password });
+    const upgraded = db
+      .prepare('SELECT password_hash, password_salt, password_kdf_version FROM app_users WHERE id = ?')
+      .get('legacy-user');
+    const expected = await derivePbkdf2PasswordHash(
+      globalThis.crypto,
+      new TextEncoder().encode(password),
+      upgraded.password_salt,
+      PASSWORD_ITERATIONS
+    );
+
+    expect(response.status).toBe(200);
+    expect(upgraded.password_kdf_version).toBe(2);
+    expect(upgraded.password_salt).not.toBe(saltHex);
+    expect(upgraded.password_hash).toBe(expected);
   });
 
   it('sesión vencida, logout y token revocado dejan de autenticar', async () => {
@@ -256,6 +310,7 @@ function createTestD1() {
   db.exec(readFileSync('migrations/0002_remove_incorrect_62000_record.sql', 'utf8'));
   db.exec(readFileSync('migrations/0003_password_auth.sql', 'utf8'));
   db.exec(readFileSync('migrations/0004_add_quantity_unit.sql', 'utf8'));
+  db.exec(readFileSync('migrations/0005_track_password_kdf_version.sql', 'utf8'));
   insertOwner(db, 'santi', 'Santi', ownerPasswordData.santi);
   insertOwner(db, 'leandro', 'Leandro', ownerPasswordData.leandro);
   dbs.push(db);
@@ -273,13 +328,14 @@ function insertOwner(db, id, displayName, passwordData) {
         password_salt,
         password_algorithm,
         password_iterations,
+        password_kdf_version,
         role,
         can_access_budines,
         created_at,
         updated_at,
         disabled_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, 'owner', 1, ?, ?, NULL)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 2, 'owner', 1, ?, ?, NULL)
     `
   ).run(
     id,

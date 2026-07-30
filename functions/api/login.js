@@ -6,6 +6,7 @@ import {
   getClientKey,
   recordAuthFailure,
   runDummyPasswordCheck,
+  upgradeLegacyPasswordHash,
   verifyPassword
 } from '../_shared/auth.js';
 import {
@@ -42,6 +43,7 @@ export async function onRequest(context) {
         throwInvalidCredentials();
       }
 
+      await upgradeLegacyPasswordHash(db, user, password);
       await clearAuthRateLimit(db, rateLimitKey);
       const session = await createSession(db, context.env, user.id, context.request.url);
 
@@ -78,6 +80,7 @@ async function findUserByUsername(db, usernameNormalized) {
           password_salt,
           password_algorithm,
           password_iterations,
+          password_kdf_version,
           role,
           can_access_budines,
           disabled_at

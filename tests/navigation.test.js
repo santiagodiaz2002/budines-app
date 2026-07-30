@@ -50,6 +50,27 @@ describe('navegacion inferior de herramientas', () => {
     expect(document.querySelector('#tab-truco').getAttribute('aria-selected')).toBe('true');
   });
 
+  it('recorre pestañas con flechas, Home y End', () => {
+    setupDom();
+    initToolNavigation();
+
+    document.querySelector('#tab-budines').dispatchEvent(
+      new windowRef.KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true })
+    );
+    expect(document.querySelector('#tab-tuner').getAttribute('aria-selected')).toBe('true');
+
+    document.querySelector('#tab-tuner').dispatchEvent(
+      new windowRef.KeyboardEvent('keydown', { key: 'Home', bubbles: true })
+    );
+    expect(document.querySelector('#tab-budines').getAttribute('aria-selected')).toBe('true');
+
+    document.querySelector('#tab-budines').dispatchEvent(
+      new windowRef.KeyboardEvent('keydown', { key: 'End', bubbles: true })
+    );
+    expect(document.querySelector('#tab-tuner').getAttribute('aria-selected')).toBe('true');
+    expect(document.activeElement).toBe(document.querySelector('#tab-tuner'));
+  });
+
   it('permite inicializar solo herramientas locales sin Budines', () => {
     setupDom();
     document.querySelector('#tab-budines').remove();
