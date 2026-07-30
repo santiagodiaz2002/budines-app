@@ -4,7 +4,7 @@ export async function onRequest(context) {
 
   headers.set('X-Content-Type-Options', 'nosniff');
   headers.set('Referrer-Policy', 'no-referrer');
-  headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
+  headers.set('Permissions-Policy', 'camera=(), microphone=(self), geolocation=(), payment=()');
   headers.set('X-Frame-Options', 'DENY');
   headers.set(
     'Content-Security-Policy',

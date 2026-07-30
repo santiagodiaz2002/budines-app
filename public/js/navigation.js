@@ -27,13 +27,18 @@ export function initToolNavigation({
 
   nav.addEventListener('keydown', (event) => {
     const activeIndex = buttons.findIndex((button) => button.dataset.toolTab === currentTab);
-    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') {
+    const supportedKeys = ['ArrowLeft', 'ArrowRight', 'Home', 'End'];
+    if (!supportedKeys.includes(event.key)) {
       return;
     }
 
     event.preventDefault();
-    const direction = event.key === 'ArrowRight' ? 1 : -1;
-    const nextIndex = (activeIndex + direction + buttons.length) % buttons.length;
+    const nextIndex =
+      event.key === 'Home'
+        ? 0
+        : event.key === 'End'
+          ? buttons.length - 1
+          : (activeIndex + (event.key === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length;
     buttons[nextIndex].focus();
     selectTab(buttons[nextIndex].dataset.toolTab);
   });

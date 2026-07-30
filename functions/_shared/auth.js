@@ -14,7 +14,7 @@ import {
 import { addDaysIso, nowIso } from './dates.js';
 import { ApiError } from './http.js';
 import { constantTimeEqualHex, randomHex, sha256Hex } from './crypto.js';
-import { derivePbkdf2PasswordHash } from './password-kdf.js';
+import { deriveLegacyPasswordHash, derivePbkdf2PasswordHash } from './password-kdf.js';
 
 const encoder = new TextEncoder();
 const DUMMY_SALT_HEX = '00'.repeat(PASSWORD_SALT_BYTES);
@@ -41,8 +41,40 @@ export async function verifyPassword(password, user) {
     return false;
   }
 
-  const hashHex = await derivePasswordHash(password, user.password_salt, Number(user.password_iterations));
+  const derive = Number(user.password_kdf_version) === 1 ? deriveLegacyHash : derivePasswordHash;
+  const hashHex = await derive(password, user.password_salt, Number(user.password_iterations));
   return constantTimeEqualHex(hashHex, user.password_hash);
+}
+
+export async function upgradeLegacyPasswordHash(db, user, password) {
+  if (Number(user?.password_kdf_version) !== 1) {
+    return;
+  }
+
+  const passwordData = await hashPassword(password);
+  await db
+    .prepare(
+      `
+        UPDATE app_users
+        SET password_hash = ?,
+            password_salt = ?,
+            password_algorithm = ?,
+            password_iterations = ?,
+            password_kdf_version = 2,
+            updated_at = ?
+        WHERE id = ?
+          AND password_kdf_version = 1
+      `
+    )
+    .bind(
+      passwordData.hashHex,
+      passwordData.saltHex,
+      passwordData.algorithm,
+      passwordData.iterations,
+      nowIso(),
+      user.id
+    )
+    .run();
 }
 
 export async function runDummyPasswordCheck(password) {
@@ -296,6 +328,10 @@ export const AUTH_LIMITS = Object.freeze({
 
 async function derivePasswordHash(password, saltHex, iterations) {
   return derivePbkdf2PasswordHash(crypto, encoder.encode(password), saltHex, iterations);
+}
+
+async function deriveLegacyHash(password, saltHex, iterations) {
+  return deriveLegacyPasswordHash(crypto, encoder.encode(password), saltHex, iterations);
 }
 
 function buildSessionCookie(token, expiresAt, sessionDays) {

@@ -67,7 +67,11 @@ export function initMetronome(root = document.querySelector('#metronome-tool'), 
       renderVoiceOptions();
       persistState();
     },
-    onError: (message) => setStatus(message)
+    onError: (message) => {
+      if (running) {
+        setStatus(message);
+      }
+    }
   });
   const audio = new MetronomeAudio({
     speech,
@@ -947,6 +951,7 @@ export function initMetronome(root = document.querySelector('#metronome-tool'), 
       return Promise.resolve(null);
     }
 
+    const trigger = document.activeElement;
     dom.nameTitle.textContent = title;
     dom.nameCopy.textContent = copy;
     dom.nameInput.value = initialValue;
@@ -957,7 +962,7 @@ export function initMetronome(root = document.querySelector('#metronome-tool'), 
     dom.nameInput.select();
 
     return new Promise((resolve) => {
-      pendingNameDialog = { resolve };
+      pendingNameDialog = { resolve, trigger };
     });
   }
 
@@ -977,11 +982,14 @@ export function initMetronome(root = document.querySelector('#metronome-tool'), 
       return;
     }
 
-    const { resolve } = pendingNameDialog;
+    const { resolve, trigger } = pendingNameDialog;
     pendingNameDialog = null;
     dom.nameDialog.hidden = true;
     dom.nameInput.value = '';
     dom.nameError.textContent = '';
+    if (trigger?.isConnected && typeof trigger.focus === 'function') {
+      trigger.focus();
+    }
     resolve(value);
   }
 
@@ -990,6 +998,7 @@ export function initMetronome(root = document.querySelector('#metronome-tool'), 
       return Promise.resolve(false);
     }
 
+    const trigger = document.activeElement;
     dom.confirmTitle.textContent = title;
     dom.confirmCopy.textContent = copy;
     dom.confirmAccept.textContent = confirmText;
@@ -997,7 +1006,7 @@ export function initMetronome(root = document.querySelector('#metronome-tool'), 
     dom.confirmCancel.focus();
 
     return new Promise((resolve) => {
-      pendingConfirmDialog = { resolve };
+      pendingConfirmDialog = { resolve, trigger };
     });
   }
 
@@ -1006,9 +1015,12 @@ export function initMetronome(root = document.querySelector('#metronome-tool'), 
       return;
     }
 
-    const { resolve } = pendingConfirmDialog;
+    const { resolve, trigger } = pendingConfirmDialog;
     pendingConfirmDialog = null;
     dom.confirmDialog.hidden = true;
+    if (trigger?.isConnected && typeof trigger.focus === 'function') {
+      trigger.focus();
+    }
     resolve(value);
   }
 
@@ -1031,6 +1043,10 @@ export function initMetronome(root = document.querySelector('#metronome-tool'), 
   }
 
   function updateButtons() {
+    const playbackState = running ? (paused ? 'paused' : 'playing') : 'stopped';
+    root.dataset.playbackState = playbackState;
+    dom.transportState.textContent =
+      playbackState === 'playing' ? 'En marcha' : playbackState === 'paused' ? 'En pausa' : 'Detenido';
     dom.start.disabled = running;
     dom.pause.disabled = !running;
     dom.pause.textContent = paused ? 'Reanudar' : 'Pausar';
@@ -1466,6 +1482,7 @@ function collectDom(root) {
     tap: root.querySelector('#metronome-tap'),
     volume: root.querySelector('#metronome-volume'),
     status: root.querySelector('#metronome-status'),
+    transportState: root.querySelector('#metronome-transport-state'),
     pulse: root.querySelector('#metronome-pulse'),
     measure: root.querySelector('#metronome-measure'),
     block: root.querySelector('#metronome-block'),

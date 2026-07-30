@@ -16,10 +16,10 @@ import {
   formatRecordType
 } from './format.js';
 import { createAudioCoordinator } from './audio-coordinator.js';
-import { initMetronome } from './metronome-editor.js?v=auth-20260723';
-import { initToolNavigation } from './navigation.js';
+import { initMetronome } from './metronome-editor.js?v=redesign13-20260730';
+import { initToolNavigation } from './navigation.js?v=redesign13-20260730';
 import { initTruco } from './truco.js?v=auth-20260723';
-import { initTuner } from './tuner.js';
+import { initTuner } from './tuner.js?v=redesign13-20260730';
 import { clearLocalStorageUser, setLocalStorageUser } from './local-storage.js?v=auth-20260723';
 import { parsePositiveIntegerText, validateSaleFields } from './validation.js?v=quantity-20260723';
 
@@ -59,6 +59,9 @@ const dom = {
   budinesTab: document.querySelector('#tab-budines'),
   appView: document.querySelector('#app-view'),
   summaryTotal: document.querySelector('#summary-total'),
+  summaryProgress: document.querySelector('#summary-progress'),
+  summaryProgressFill: document.querySelector('#summary-progress-fill'),
+  summaryProgressLabel: document.querySelector('#summary-progress-label'),
   summaryLines: document.querySelector('#summary-lines'),
   showEntry: document.querySelector('#show-entry'),
   showRecords: document.querySelector('#show-records'),
@@ -139,6 +142,8 @@ function bindEvents() {
   dom.amountInput.addEventListener('input', handleSaleInputChange);
   dom.showEntry.addEventListener('click', () => switchView('entry'));
   dom.showRecords.addEventListener('click', () => switchView('records'));
+  dom.showEntry.addEventListener('keydown', handleBudinesTabKeydown);
+  dom.showRecords.addEventListener('keydown', handleBudinesTabKeydown);
   dom.reloadRecords.addEventListener('click', () => loadRecords({ reset: true }));
   dom.loadMoreRecords.addEventListener('click', () => loadRecords({ reset: false }));
   dom.logoutButton.addEventListener('click', handleLogout);
@@ -340,7 +345,8 @@ async function loadSummary() {
     const result = await getSummary();
     renderSummary(result.summary);
   } catch (error) {
-    dom.summaryTotal.textContent = 'Sin datos';
+    setSummaryTotal('Sin datos');
+    renderSummaryProgress(null);
     dom.summaryLines.replaceChildren(summaryLine('Error', error.message));
   }
 }
@@ -379,7 +385,8 @@ async function loadRecords({ reset }) {
 }
 
 function renderSummary(summary) {
-  dom.summaryTotal.textContent = formatArs(summary.totalArs);
+  setSummaryTotal(formatArs(summary.totalArs));
+  renderSummaryProgress(summary);
   const lines = [summaryLine('Inversión', formatArs(summary.investmentArs))];
 
   if (!summary.investmentRecovered) {
@@ -390,6 +397,25 @@ function renderSummary(summary) {
   }
 
   dom.summaryLines.replaceChildren(...lines);
+}
+
+function setSummaryTotal(value) {
+  const text = String(value);
+  dom.summaryTotal.textContent = text;
+  dom.summaryTotal.classList.toggle('is-compact', text.length >= 13);
+}
+
+function renderSummaryProgress(summary) {
+  const investment = Number(summary?.investmentArs);
+  const total = Number(summary?.totalArs);
+  const percentage =
+    Number.isFinite(investment) && investment > 0 && Number.isFinite(total)
+      ? Math.round(Math.max(0, Math.min(100, (total / investment) * 100)))
+      : 0;
+
+  dom.summaryProgressFill.style.width = `${percentage}%`;
+  dom.summaryProgressLabel.textContent = `${percentage}%`;
+  dom.summaryProgress.setAttribute('aria-valuenow', String(percentage));
 }
 
 function summaryLine(label, value, className = '') {
@@ -524,6 +550,59 @@ function handleDocumentKeydown(event) {
   if (event.key === 'Escape' && !dom.voidDialog.hidden) {
     closeDeleteDialog();
   }
+
+  if (event.key !== 'Tab') {
+    return;
+  }
+
+  const dialog = document.querySelector('.dialog-backdrop:not([hidden])');
+  if (!dialog) {
+    return;
+  }
+
+  const focusable = [...dialog.querySelectorAll(
+    'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
+  )].filter((element) => element.getClientRects().length > 0);
+
+  if (focusable.length === 0) {
+    event.preventDefault();
+    return;
+  }
+
+  const first = focusable[0];
+  const last = focusable.at(-1);
+  if (!dialog.contains(document.activeElement)) {
+    event.preventDefault();
+    (event.shiftKey ? last : first).focus();
+  } else if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
+}
+
+function handleBudinesTabKeydown(event) {
+  const tabs = [dom.showEntry, dom.showRecords];
+  let nextIndex;
+
+  if (event.key === 'ArrowLeft') {
+    nextIndex = Math.max(0, tabs.indexOf(event.currentTarget) - 1);
+  } else if (event.key === 'ArrowRight') {
+    nextIndex = Math.min(tabs.length - 1, tabs.indexOf(event.currentTarget) + 1);
+  } else if (event.key === 'Home') {
+    nextIndex = 0;
+  } else if (event.key === 'End') {
+    nextIndex = tabs.length - 1;
+  } else {
+    return;
+  }
+
+  event.preventDefault();
+  const target = tabs[nextIndex];
+  switchView(target === dom.showRecords ? 'records' : 'entry');
+  target.focus();
 }
 
 function switchView(view) {
@@ -536,6 +615,10 @@ function switchView(view) {
   dom.recordsSection.hidden = !records;
   dom.showEntry.classList.toggle('is-active', !records);
   dom.showRecords.classList.toggle('is-active', records);
+  dom.showEntry.setAttribute('aria-selected', records ? 'false' : 'true');
+  dom.showRecords.setAttribute('aria-selected', records ? 'true' : 'false');
+  dom.showEntry.tabIndex = records ? -1 : 0;
+  dom.showRecords.tabIndex = records ? 0 : -1;
 
   if (records) {
     loadRecords({ reset: true });
@@ -646,7 +729,8 @@ function hideToolPanels() {
 }
 
 function clearBudinesData() {
-  dom.summaryTotal.textContent = '$ 0';
+  setSummaryTotal('$ 0');
+  renderSummaryProgress(null);
   dom.summaryLines.replaceChildren();
   dom.recordsList.replaceChildren();
   dom.recordsState.textContent = '';
@@ -728,7 +812,7 @@ function setSaleBusy(isBusy) {
   for (const button of dom.quantityUnitButtons) {
     button.disabled = isBusy;
   }
-  dom.saleSubmit.textContent = isBusy ? 'Guardando...' : 'Registrar';
+  dom.saleSubmit.textContent = isBusy ? 'Guardando...' : 'Guardar venta';
   if (!isBusy) {
     dom.gramsInput.removeAttribute('aria-invalid');
     dom.amountInput.removeAttribute('aria-invalid');
