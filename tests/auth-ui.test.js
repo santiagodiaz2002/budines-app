@@ -69,6 +69,7 @@ describe('pantalla de acceso y permisos de UI', () => {
 
     expect(document.querySelector('#tab-budines')).toBeNull();
     expect(document.querySelector('#budines-tool')).toBeNull();
+    expect(document.querySelector('#owner-summary-button')).toBeNull();
     expect([...document.querySelectorAll('[data-tool-tab]')].map((tab) => tab.dataset.toolTab)).toEqual([
       'truco',
       'metronome',
@@ -76,15 +77,19 @@ describe('pantalla de acceso y permisos de UI', () => {
     ]);
     expect(document.querySelector('#truco-tool').hidden).toBe(false);
     expect(fetchCalls.some((call) => call.path === '/api/summary')).toBe(false);
+    expect(fetchCalls.some((call) => call.path === '/api/owner-summary')).toBe(false);
     expect(fetchCalls.some((call) => call.path === '/api/records')).toBe(false);
     expect(document.querySelector('#session-badge').textContent).toBe('Comun');
     expect(document.querySelector('#user-session').textContent).not.toContain('common');
   });
 
-  it('owner ve cuatro pestañas y carga Budines después del login', async () => {
+  it.each([
+    ['santi', 'Santi'],
+    ['leandro', 'Leandro']
+  ])('%s ve cuatro pestañas y carga Budines', async (id, displayName) => {
     loginUser = {
-      id: 'santi',
-      displayName: 'Santi',
+      id,
+      displayName,
       capabilities: {
         canAccessBudines: true
       }
@@ -92,7 +97,7 @@ describe('pantalla de acceso y permisos de UI', () => {
 
     await importApp();
     await waitFor(() => !document.querySelector('#auth-view').hidden);
-    document.querySelector('#auth-username').value = 'santi';
+    document.querySelector('#auth-username').value = id;
     document.querySelector('#auth-password').value = 'owner-password';
     document.querySelector('#auth-form').dispatchEvent(new windowRef.Event('submit', { bubbles: true, cancelable: true }));
 
@@ -107,6 +112,19 @@ describe('pantalla de acceso y permisos de UI', () => {
     expect(fetchCalls.some((call) => call.path === '/api/summary')).toBe(true);
     expect(fetchCalls.some((call) => call.path === '/api/records')).toBe(true);
     expect(document.querySelector('#summary-total').textContent).toContain('3.000');
+    const ownerSummaryButton = document.querySelector('#owner-summary-button');
+    expect(ownerSummaryButton).not.toBeNull();
+    expect(ownerSummaryButton.hidden).toBe(false);
+    expect(ownerSummaryButton.textContent).toBe('Resumen');
+    expect(fetchCalls.some((call) => call.path === '/api/owner-summary')).toBe(false);
+
+    ownerSummaryButton.click();
+    await waitFor(() => !document.querySelector('#owner-summary-details').hidden);
+
+    expect(fetchCalls.some((call) => call.path === '/api/owner-summary' && call.method === 'GET')).toBe(true);
+    expect(document.querySelector('#owner-summary-dialog').hidden).toBe(false);
+    expect(document.querySelector('#owner-summary-total').textContent).toContain('3.000');
+    document.querySelector('#owner-summary-close').click();
   });
 
   it('logout llama backend, cancela voz y vuelve al acceso', async () => {
@@ -227,6 +245,17 @@ async function handleFetch(input, options = {}) {
         investmentRecovered: false,
         missingArs: 117000,
         profitArs: 0
+      }
+    });
+  }
+
+  if (url.pathname === '/api/owner-summary') {
+    return json({
+      ok: true,
+      summary: {
+        santiArs: 2000,
+        leandroArs: 1000,
+        totalArs: 3000
       }
     });
   }

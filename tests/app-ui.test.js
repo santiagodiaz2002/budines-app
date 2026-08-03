@@ -7,6 +7,10 @@ const html = readFileSync('public/index.html', 'utf8');
 let windowRef;
 let records;
 let summary;
+let ownerSummary;
+let ownerSummaryCalls;
+let ownerSummaryShouldFail;
+let ownerSummaryGate;
 let deleteCalls;
 let createCalls;
 let deleteShouldFail;
@@ -34,6 +38,14 @@ beforeEach(async () => {
     missingArs: 117000,
     profitArs: 0
   };
+  ownerSummary = {
+    santiArs: 2000,
+    leandroArs: 1000,
+    totalArs: 3000
+  };
+  ownerSummaryCalls = 0;
+  ownerSummaryShouldFail = false;
+  ownerSummaryGate = null;
   deleteCalls = [];
   createCalls = [];
   deleteShouldFail = false;
@@ -208,6 +220,173 @@ describe('interfaz de carga de Budines', () => {
   });
 });
 
+describe('resumen por propietario', () => {
+  it('muestra carga sin importes anteriores y publica solo la respuesta nueva', async () => {
+    const button = document.querySelector('#owner-summary-button');
+    const dialog = document.querySelector('#owner-summary-dialog');
+
+    button.click();
+    await waitFor(() => !document.querySelector('#owner-summary-details').hidden);
+    expect(document.querySelector('#owner-summary-santi').textContent).toContain('2.000');
+    document.querySelector('#owner-summary-close').click();
+
+    ownerSummary = {
+      santiArs: 5000,
+      leandroArs: 7000,
+      totalArs: 12000
+    };
+    ownerSummaryGate = createDeferred();
+    button.click();
+
+    expect(dialog.hidden).toBe(false);
+    expect(dialog.getAttribute('aria-busy')).toBe('true');
+    expect(document.querySelector('#owner-summary-state').textContent).toBe('Cargando resumen...');
+    expect(document.querySelector('#owner-summary-details').hidden).toBe(true);
+    expect(document.querySelector('#owner-summary-santi').textContent).toBe('');
+    expect(document.querySelector('#owner-summary-leandro').textContent).toBe('');
+    expect(document.querySelector('#owner-summary-total').textContent).toBe('');
+    expect(dialog.textContent).not.toContain('2.000');
+
+    ownerSummaryGate.resolve();
+    await waitFor(() => !document.querySelector('#owner-summary-details').hidden);
+
+    expect(document.querySelector('#owner-summary-santi').textContent).toContain('5.000');
+    expect(document.querySelector('#owner-summary-leandro').textContent).toContain('7.000');
+    expect(document.querySelector('#owner-summary-total').textContent).toContain('12.000');
+    expect(dialog.hasAttribute('aria-busy')).toBe(false);
+    expect(ownerSummaryCalls).toBe(2);
+  });
+
+  it('muestra importes argentinos, incluido cero, y metadatos accesibles', async () => {
+    ownerSummary = {
+      santiArs: 125000,
+      leandroArs: 0,
+      totalArs: 125000
+    };
+
+    document.querySelector('#owner-summary-button').click();
+
+    const dialog = document.querySelector('#owner-summary-dialog');
+    expect(dialog.hidden).toBe(false);
+    expect(dialog.getAttribute('role')).toBe('dialog');
+    expect(dialog.getAttribute('aria-modal')).toBe('true');
+    expect(dialog.getAttribute('aria-labelledby')).toBe('owner-summary-title');
+    expect(document.querySelector('#owner-summary-title').textContent).toBe('Resumen');
+    expect(document.activeElement).toBe(document.querySelector('#owner-summary-close'));
+
+    await waitFor(() => !document.querySelector('#owner-summary-details').hidden);
+
+    expect(document.querySelector('#owner-summary-santi').textContent).toContain('$');
+    expect(document.querySelector('#owner-summary-santi').textContent).toContain('125.000');
+    expect(document.querySelector('#owner-summary-leandro').textContent).toContain('$');
+    expect(document.querySelector('#owner-summary-leandro').textContent).toContain('0');
+    expect(document.querySelector('#owner-summary-total').textContent).toContain('125.000');
+    expect(document.querySelector('#owner-summary-state').textContent).toBe('Importes actualizados.');
+  });
+
+  it('vuelve a consultar al reabrir y refleja datos persistidos mas recientes', async () => {
+    ownerSummary = {
+      santiArs: 100,
+      leandroArs: 200,
+      totalArs: 300
+    };
+    const button = document.querySelector('#owner-summary-button');
+
+    button.click();
+    await waitFor(() => !document.querySelector('#owner-summary-details').hidden);
+    expect(document.querySelector('#owner-summary-santi').textContent).toContain('100');
+    document.querySelector('#owner-summary-close').click();
+
+    ownerSummary = {
+      santiArs: 9000,
+      leandroArs: 0,
+      totalArs: 9000
+    };
+    button.click();
+    await waitFor(() => document.querySelector('#owner-summary-santi').textContent.includes('9.000'));
+
+    expect(ownerSummaryCalls).toBe(2);
+    expect(document.querySelector('#owner-summary-santi').textContent).toContain('9.000');
+    expect(document.querySelector('#owner-summary-santi').textContent).not.toContain('100');
+    expect(document.querySelector('#owner-summary-leandro').textContent).toContain('0');
+    expect(document.querySelector('#owner-summary-total').textContent).toContain('9.000');
+  });
+
+  it('un error oculta y limpia todos los importes anteriores', async () => {
+    ownerSummary = {
+      santiArs: 8888,
+      leandroArs: 1111,
+      totalArs: 9999
+    };
+    const button = document.querySelector('#owner-summary-button');
+
+    button.click();
+    await waitFor(() => !document.querySelector('#owner-summary-details').hidden);
+    expect(document.querySelector('#owner-summary-santi').textContent).toContain('8.888');
+    document.querySelector('#owner-summary-close').click();
+
+    ownerSummaryShouldFail = true;
+    button.click();
+
+    expect(document.querySelector('#owner-summary-details').hidden).toBe(true);
+    expect(document.querySelector('#owner-summary-santi').textContent).toBe('');
+    expect(document.querySelector('#owner-summary-leandro').textContent).toBe('');
+    expect(document.querySelector('#owner-summary-total').textContent).toBe('');
+
+    await waitFor(() => document.querySelector('#owner-summary-state').classList.contains('is-error'));
+
+    expect(document.querySelector('#owner-summary-state').textContent).toBe('No se pudo cargar el resumen.');
+    expect(document.querySelector('#owner-summary-details').hidden).toBe(true);
+    expect(document.querySelector('#owner-summary-dialog').textContent).not.toContain('8.888');
+  });
+
+  it.each([
+    ['un importe nulo', { santiArs: null, leandroArs: 1000, totalArs: 1000 }],
+    ['un campo ausente', { santiArs: 1000, totalArs: 1000 }],
+    ['un importe textual', { santiArs: '1000', leandroArs: 0, totalArs: 1000 }],
+    ['un total inconsistente', { santiArs: 1000, leandroArs: 2000, totalArs: 4000 }]
+  ])('rechaza %s sin mostrar NaN ni undefined', async (_case, invalidSummary) => {
+    ownerSummary = invalidSummary;
+    document.querySelector('#owner-summary-button').click();
+
+    await waitFor(() => document.querySelector('#owner-summary-state').classList.contains('is-error'));
+
+    expect(document.querySelector('#owner-summary-state').textContent).toBe('El resumen recibido no es válido.');
+    expect(document.querySelector('#owner-summary-details').hidden).toBe(true);
+    expect(document.querySelector('#owner-summary-santi').textContent).toBe('');
+    expect(document.querySelector('#owner-summary-leandro').textContent).toBe('');
+    expect(document.querySelector('#owner-summary-total').textContent).toBe('');
+    expect(document.querySelector('#owner-summary-dialog').textContent).not.toMatch(/NaN|undefined/);
+  });
+
+  it('cierra con boton, Escape y backdrop y devuelve el foco al disparador', async () => {
+    const button = document.querySelector('#owner-summary-button');
+    const dialog = document.querySelector('#owner-summary-dialog');
+    const close = document.querySelector('#owner-summary-close');
+
+    button.focus();
+    button.click();
+    expect(document.activeElement).toBe(close);
+    close.click();
+    expect(dialog.hidden).toBe(true);
+    expect(document.activeElement).toBe(button);
+
+    button.click();
+    document.dispatchEvent(new windowRef.KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(dialog.hidden).toBe(true);
+    expect(document.activeElement).toBe(button);
+
+    button.click();
+    dialog.dispatchEvent(new windowRef.MouseEvent('click', { bubbles: true }));
+    expect(dialog.hidden).toBe(true);
+    expect(document.activeElement).toBe(button);
+
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(ownerSummaryCalls).toBe(3);
+  });
+});
+
 describe('interfaz de eliminacion de registros', () => {
   it('tocar un registro abre el panel con etiquetas accesibles', async () => {
     const card = document.querySelector('[data-record-card]');
@@ -297,6 +476,31 @@ async function handleFetch(input, options = {}) {
     return json({
       ok: true,
       summary
+    });
+  }
+
+  if (url.pathname === '/api/owner-summary') {
+    ownerSummaryCalls += 1;
+    if (ownerSummaryGate) {
+      await ownerSummaryGate.promise;
+    }
+
+    if (ownerSummaryShouldFail) {
+      return json(
+        {
+          ok: false,
+          error: {
+            code: 'owner_summary_failed',
+            message: 'No se pudo cargar el resumen.'
+          }
+        },
+        500
+      );
+    }
+
+    return json({
+      ok: true,
+      summary: ownerSummary
     });
   }
 
@@ -406,6 +610,14 @@ function json(payload, status = 200) {
       'Content-Type': 'application/json'
     }
   });
+}
+
+function createDeferred() {
+  let resolve;
+  const promise = new Promise((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
 }
 
 async function waitFor(predicate) {

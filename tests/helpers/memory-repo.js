@@ -16,6 +16,20 @@ export function createMemoryRepo({ investmentArs = 120000, records = defaultReco
         .reduce((sum, record) => sum + record.amountArs, 0);
     },
 
+    async getActiveOwnerTotalsArs() {
+      const activeSales = store.filter(
+        (record) => record.type === 'venta' && record.status === 'activo' && !record.deletedAt
+      );
+      return {
+        santiArs: activeSales
+          .filter((record) => record.userId === 'santi')
+          .reduce((sum, record) => sum + record.amountArs, 0),
+        leandroArs: activeSales
+          .filter((record) => record.userId === 'leandro')
+          .reduce((sum, record) => sum + record.amountArs, 0)
+      };
+    },
+
     async findRecordById(recordId) {
       return store.find((record) => record.id === recordId) || null;
     },

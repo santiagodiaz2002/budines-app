@@ -10,6 +10,7 @@ import {
 } from '../functions/_shared/password-kdf.js';
 import { onRequest as loginEndpoint } from '../functions/api/login.js';
 import { onRequest as logoutEndpoint } from '../functions/api/logout.js';
+import { onRequest as ownerSummaryEndpoint } from '../functions/api/owner-summary.js';
 import { onRequest as recordsEndpoint } from '../functions/api/records/index.js';
 import { onRequest as registerEndpoint } from '../functions/api/register.js';
 import { onRequest as sessionEndpoint } from '../functions/api/session.js';
@@ -228,7 +229,12 @@ describe('autenticación por usuario y contraseña', () => {
       request: new Request(`${ORIGIN}/api/summary`),
       env: { DB: d1 }
     });
+    const ownerSummaryNoSession = await ownerSummaryEndpoint({
+      request: new Request(`${ORIGIN}/api/owner-summary`),
+      env: { DB: d1 }
+    });
     expect(noSession.status).toBe(401);
+    expect(ownerSummaryNoSession.status).toBe(401);
     await expect(requireSession({ request: new Request(`${ORIGIN}/api/session`), env: { DB: d1 } })).rejects.toMatchObject({
       status: 401
     });
@@ -243,6 +249,10 @@ describe('autenticación por usuario y contraseña', () => {
     });
 
     const summary = await summaryEndpoint({ request: request('/api/summary', { cookie }), env: { DB: d1 } });
+    const ownerSummary = await ownerSummaryEndpoint({
+      request: request('/api/owner-summary', { cookie }),
+      env: { DB: d1 }
+    });
     const list = await recordsEndpoint({ request: request('/api/records', { cookie }), env: { DB: d1 } });
     const create = await recordsEndpoint({
       request: request('/api/records', {
@@ -273,6 +283,7 @@ describe('autenticación por usuario y contraseña', () => {
     });
 
     expect(summary.status).toBe(403);
+    expect(ownerSummary.status).toBe(403);
     expect(list.status).toBe(403);
     expect(create.status).toBe(403);
     expect(voided.status).toBe(403);
@@ -281,6 +292,87 @@ describe('autenticación por usuario y contraseña', () => {
       error: {
         code: 'forbidden',
         message: 'No autorizado.'
+      }
+    });
+    expect(await ownerSummary.json()).toEqual({
+      ok: false,
+      error: {
+        code: 'forbidden',
+        message: 'No autorizado.'
+      }
+    });
+  });
+
+  it('resume importes persistidos por usuario, excluye bajas y refleja cambios en D1', async () => {
+    const { d1, db } = createTestD1();
+    const santiLogin = await loginUser(d1, { username: 'SANTI', password: OWNER_TEST_PASSWORD });
+    const leandroLogin = await loginUser(d1, { username: 'leandro', password: OWNER_TEST_PASSWORD });
+    const santiCookie = santiLogin.headers.get('Set-Cookie');
+    const leandroCookie = leandroLogin.headers.get('Set-Cookie');
+
+    const initialForSanti = await ownerSummaryEndpoint({
+      request: request('/api/owner-summary', { cookie: santiCookie }),
+      env: { DB: d1 }
+    });
+    const initialForLeandro = await ownerSummaryEndpoint({
+      request: request('/api/owner-summary', { cookie: leandroCookie }),
+      env: { DB: d1 }
+    });
+
+    expect(initialForSanti.status).toBe(200);
+    expect(initialForLeandro.status).toBe(200);
+    expect(initialForSanti.headers.get('Cache-Control')).toBe('no-store');
+    expect(await initialForSanti.json()).toEqual({
+      ok: true,
+      summary: {
+        santiArs: 0,
+        leandroArs: 0,
+        totalArs: 0
+      }
+    });
+
+    const santiCreated = await createSaleThroughApi(d1, santiCookie, '1000', 'idem-owner-summary-santi');
+    const leandroCreated = await createSaleThroughApi(d1, leandroCookie, '2500', 'idem-owner-summary-leandro');
+    const laterDeleted = await createSaleThroughApi(d1, santiCookie, '9000', 'idem-owner-summary-deleted');
+    const deleted = await voidEndpoint({
+      request: request(`/api/records/${laterDeleted.id}/void`, {
+        method: 'POST',
+        cookie: leandroCookie,
+        body: { confirmation: 'ELIMINAR' }
+      }),
+      env: { DB: d1 },
+      params: { id: laterDeleted.id }
+    });
+
+    expect(santiCreated.amountArs).toBe(1000);
+    expect(leandroCreated.amountArs).toBe(2500);
+    expect(deleted.status).toBe(200);
+
+    const populated = await ownerSummaryEndpoint({
+      request: request('/api/owner-summary', { cookie: santiCookie }),
+      env: { DB: d1 }
+    });
+    expect(await populated.json()).toEqual({
+      ok: true,
+      summary: {
+        santiArs: 1000,
+        leandroArs: 2500,
+        totalArs: 3500
+      }
+    });
+
+    db.prepare('UPDATE records SET amount_ars = ? WHERE id = ?').run(4000, santiCreated.id);
+
+    const updated = await ownerSummaryEndpoint({
+      request: request('/api/owner-summary', { cookie: leandroCookie }),
+      env: { DB: d1 }
+    });
+    expect(await updated.json()).toEqual({
+      ok: true,
+      summary: {
+        santiArs: 4000,
+        leandroArs: 2500,
+        totalArs: 6500
       }
     });
   });
@@ -386,6 +478,24 @@ function logoutUser(d1, cookie) {
     request: request('/api/logout', { method: 'POST', cookie }),
     env: { DB: d1 }
   });
+}
+
+async function createSaleThroughApi(d1, cookie, amountArs, idempotencyKey) {
+  const response = await recordsEndpoint({
+    request: request('/api/records', {
+      method: 'POST',
+      cookie,
+      body: {
+        grams: '1',
+        quantityUnit: 'GR',
+        amountArs,
+        idempotencyKey
+      }
+    }),
+    env: { DB: d1 }
+  });
+  expect(response.status).toBe(201);
+  return (await response.json()).record;
 }
 
 async function currentSessionBody(d1, cookie) {

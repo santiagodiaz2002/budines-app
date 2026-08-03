@@ -1,3 +1,4 @@
+import { ALLOWED_USERS } from './constants.js';
 import { ApiError } from './http.js';
 
 export function createD1Repository(db) {
@@ -34,6 +35,32 @@ export function createD1Repository(db) {
       }
 
       return value;
+    },
+
+    async getActiveOwnerTotalsArs() {
+      const santiId = ALLOWED_USERS.santi.id;
+      const leandroId = ALLOWED_USERS.leandro.id;
+      const row = await db
+        .prepare(
+          `
+            SELECT
+              COALESCE(SUM(CASE WHEN r.user_id = ? THEN r.amount_ars ELSE 0 END), 0) AS santi_ars,
+              COALESCE(SUM(CASE WHEN r.user_id = ? THEN r.amount_ars ELSE 0 END), 0) AS leandro_ars
+            FROM records r
+            LEFT JOIN record_deletions rd ON rd.record_id = r.id
+            WHERE r.type = 'venta'
+              AND r.status = 'activo'
+              AND rd.record_id IS NULL
+              AND r.user_id IN (?, ?)
+          `
+        )
+        .bind(santiId, leandroId, santiId, leandroId)
+        .first();
+
+      return {
+        santiArs: row?.santi_ars,
+        leandroArs: row?.leandro_ars
+      };
     },
 
     async findRecordById(recordId) {
