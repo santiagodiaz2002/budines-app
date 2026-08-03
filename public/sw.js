@@ -1,11 +1,11 @@
-const CACHE_NAME = 'budines-shell-v31-visual-redesign';
+const CACHE_NAME = 'budines-shell-v33-owner-summary';
 const SHELL_ASSETS = [
   '/',
   '/index.html',
-  '/styles.css?v=redesign13-20260730',
+  '/styles.css?v=owner-summary-20260731',
   '/js/audio-coordinator.js',
-  '/js/api.js?v=quantity-20260723',
-  '/js/app.js?v=redesign13-20260730',
+  '/js/api.js?v=owner-summary-20260731',
+  '/js/app.js?v=owner-summary-20260731',
   '/js/format.js',
   '/js/local-storage.js?v=auth-20260723',
   '/js/metronome-core.js',

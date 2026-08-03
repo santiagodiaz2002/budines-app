@@ -42,6 +42,10 @@ export async function getSummary() {
   return apiRequest('/api/summary');
 }
 
+export async function getOwnerSummary() {
+  return apiRequest('/api/owner-summary');
+}
+
 export async function listRecords({ limit = 30, offset = 0 } = {}) {
   const params = new URLSearchParams({
     limit: String(limit),

@@ -15,7 +15,7 @@
     <link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
     <link rel="icon" href="/icons/favicon-16.png" sizes="16x16" type="image/png">
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
-    <link rel="stylesheet" href="/styles.css?v=redesign13-20260730">
+    <link rel="stylesheet" href="/styles.css?v=owner-summary-20260731">
   </head>
   <body data-auth-state="booting">
     <a class="skip-link" href="#main-content">Saltar al contenido</a>
@@ -117,7 +117,10 @@
                   <p class="eyebrow">Capital compartido</p>
                   <p class="summary-label">Total acumulado</p>
                 </div>
-                <span class="summary-currency">ARS</span>
+                <div class="summary-head-actions">
+                  <span class="summary-currency">ARS</span>
+                  <button id="owner-summary-button" class="quiet-button summary-owner-button" type="button" hidden>Resumen</button>
+                </div>
               </div>
               <p id="summary-total" class="summary-total">$ 0</p>
               <div class="summary-progress-block">
@@ -540,6 +543,30 @@
       </div>
     </div>
 
+    <div id="owner-summary-dialog" class="dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="owner-summary-title" hidden>
+      <div class="dialog-panel">
+        <h2 id="owner-summary-title">Resumen</h2>
+        <p id="owner-summary-state" class="dialog-copy owner-summary-state" role="status" aria-live="polite"></p>
+        <dl id="owner-summary-details" class="dialog-details owner-summary-details" hidden>
+          <div>
+            <dt>Santi</dt>
+            <dd id="owner-summary-santi"></dd>
+          </div>
+          <div>
+            <dt>Leandro</dt>
+            <dd id="owner-summary-leandro"></dd>
+          </div>
+          <div class="owner-summary-total">
+            <dt>Total general</dt>
+            <dd id="owner-summary-total"></dd>
+          </div>
+        </dl>
+        <div class="dialog-actions owner-summary-actions">
+          <button id="owner-summary-close" class="primary-button" type="button">Cerrar</button>
+        </div>
+      </div>
+    </div>
+
     <div id="truco-reset-dialog" class="dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="truco-reset-title" hidden>
       <div class="dialog-panel">
         <h2 id="truco-reset-title">Nueva partida</h2>
@@ -620,6 +647,6 @@
     </div>
 
     <p id="live-region" class="sr-only" aria-live="polite" aria-atomic="true"></p>
-    <script type="module" src="/js/app.js?v=redesign13-20260730"></script>
+    <script type="module" src="/js/app.js?v=owner-summary-20260731"></script>
   </body>
 </html>

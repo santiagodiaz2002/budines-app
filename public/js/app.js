@@ -1,13 +1,14 @@
 import {
   createRecord,
   deleteRecord,
+  getOwnerSummary,
   getSession,
   getSummary,
   listRecords,
   login,
   logout,
   registerAccount
-} from './api.js?v=quantity-20260723';
+} from './api.js?v=owner-summary-20260731';
 import {
   formatArs,
   formatCommercialDate,
@@ -63,6 +64,7 @@ const dom = {
   summaryProgressFill: document.querySelector('#summary-progress-fill'),
   summaryProgressLabel: document.querySelector('#summary-progress-label'),
   summaryLines: document.querySelector('#summary-lines'),
+  ownerSummaryButton: document.querySelector('#owner-summary-button'),
   showEntry: document.querySelector('#show-entry'),
   showRecords: document.querySelector('#show-records'),
   entrySection: document.querySelector('#entry-section'),
@@ -86,6 +88,13 @@ const dom = {
   voidError: document.querySelector('#void-error'),
   voidCancel: document.querySelector('#void-cancel'),
   voidSubmit: document.querySelector('#void-submit'),
+  ownerSummaryDialog: document.querySelector('#owner-summary-dialog'),
+  ownerSummaryState: document.querySelector('#owner-summary-state'),
+  ownerSummaryDetails: document.querySelector('#owner-summary-details'),
+  ownerSummarySanti: document.querySelector('#owner-summary-santi'),
+  ownerSummaryLeandro: document.querySelector('#owner-summary-leandro'),
+  ownerSummaryTotal: document.querySelector('#owner-summary-total'),
+  ownerSummaryClose: document.querySelector('#owner-summary-close'),
   liveRegion: document.querySelector('#live-region')
 };
 
@@ -103,6 +112,8 @@ const state = {
   recordPendingDelete: null,
   deleteTrigger: null,
   isDeletingRecord: false,
+  ownerSummaryRequestId: 0,
+  ownerSummaryTrigger: null,
   tools: {
     initialized: false,
     navigation: null,
@@ -146,12 +157,15 @@ function bindEvents() {
   dom.showRecords.addEventListener('keydown', handleBudinesTabKeydown);
   dom.reloadRecords.addEventListener('click', () => loadRecords({ reset: true }));
   dom.loadMoreRecords.addEventListener('click', () => loadRecords({ reset: false }));
+  dom.ownerSummaryButton.addEventListener('click', openOwnerSummaryDialog);
   dom.logoutButton.addEventListener('click', handleLogout);
   dom.recordsList.addEventListener('click', handleRecordsClick);
   dom.voidCancel.addEventListener('click', closeDeleteDialog);
   dom.voidConfirmation.addEventListener('input', updateDeleteButtonState);
   dom.voidForm.addEventListener('submit', handleDeleteSubmit);
   dom.voidDialog.addEventListener('click', handleDialogBackdropClick);
+  dom.ownerSummaryClose.addEventListener('click', () => closeOwnerSummaryDialog());
+  dom.ownerSummaryDialog.addEventListener('click', handleDialogBackdropClick);
   document.addEventListener('keydown', handleDocumentKeydown);
 }
 
@@ -351,6 +365,89 @@ async function loadSummary() {
   }
 }
 
+async function openOwnerSummaryDialog() {
+  if (!canAccessBudines() || !dom.ownerSummaryButton.isConnected) {
+    return;
+  }
+
+  const requestId = ++state.ownerSummaryRequestId;
+  state.ownerSummaryTrigger = dom.ownerSummaryButton;
+  resetOwnerSummaryDialog();
+  dom.ownerSummaryState.textContent = 'Cargando resumen...';
+  dom.ownerSummaryDialog.setAttribute('aria-busy', 'true');
+  dom.ownerSummaryDialog.hidden = false;
+  dom.ownerSummaryClose.focus();
+
+  try {
+    const result = await getOwnerSummary();
+    if (requestId !== state.ownerSummaryRequestId || dom.ownerSummaryDialog.hidden) {
+      return;
+    }
+
+    renderOwnerSummary(result.summary);
+    dom.ownerSummaryState.textContent = 'Importes actualizados.';
+    announce('Resumen actualizado.');
+  } catch (error) {
+    if (requestId !== state.ownerSummaryRequestId || dom.ownerSummaryDialog.hidden) {
+      return;
+    }
+
+    resetOwnerSummaryDialog();
+    dom.ownerSummaryState.classList.add('is-error');
+    dom.ownerSummaryState.textContent = error?.message || 'No se pudo cargar el resumen.';
+    announce(dom.ownerSummaryState.textContent);
+  } finally {
+    if (requestId === state.ownerSummaryRequestId) {
+      dom.ownerSummaryDialog.removeAttribute('aria-busy');
+    }
+  }
+}
+
+function renderOwnerSummary(summary) {
+  const santiArs = validOwnerAmount(summary?.santiArs);
+  const leandroArs = validOwnerAmount(summary?.leandroArs);
+  const totalArs = validOwnerAmount(summary?.totalArs);
+  const calculatedTotal = santiArs + leandroArs;
+
+  if (!Number.isSafeInteger(calculatedTotal) || totalArs !== calculatedTotal) {
+    throw new Error('El resumen recibido no es válido.');
+  }
+
+  dom.ownerSummarySanti.textContent = formatArs(santiArs);
+  dom.ownerSummaryLeandro.textContent = formatArs(leandroArs);
+  dom.ownerSummaryTotal.textContent = formatArs(totalArs);
+  dom.ownerSummaryDetails.hidden = false;
+}
+
+function validOwnerAmount(value) {
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new Error('El resumen recibido no es válido.');
+  }
+  return value;
+}
+
+function closeOwnerSummaryDialog({ restoreFocus = true } = {}) {
+  const trigger = state.ownerSummaryTrigger;
+  state.ownerSummaryRequestId += 1;
+  state.ownerSummaryTrigger = null;
+  dom.ownerSummaryDialog.hidden = true;
+  dom.ownerSummaryDialog.removeAttribute('aria-busy');
+  resetOwnerSummaryDialog();
+
+  if (restoreFocus && trigger?.isConnected) {
+    trigger.focus();
+  }
+}
+
+function resetOwnerSummaryDialog() {
+  dom.ownerSummaryState.textContent = '';
+  dom.ownerSummaryState.classList.remove('is-error');
+  dom.ownerSummaryDetails.hidden = true;
+  dom.ownerSummarySanti.textContent = '';
+  dom.ownerSummaryLeandro.textContent = '';
+  dom.ownerSummaryTotal.textContent = '';
+}
+
 async function loadRecords({ reset }) {
   if (!canAccessBudines()) {
     return;
@@ -543,12 +640,18 @@ function updateDeleteButtonState() {
 function handleDialogBackdropClick(event) {
   if (event.target === dom.voidDialog) {
     closeDeleteDialog();
+  } else if (event.target === dom.ownerSummaryDialog) {
+    closeOwnerSummaryDialog();
   }
 }
 
 function handleDocumentKeydown(event) {
-  if (event.key === 'Escape' && !dom.voidDialog.hidden) {
-    closeDeleteDialog();
+  if (event.key === 'Escape') {
+    if (!dom.ownerSummaryDialog.hidden) {
+      closeOwnerSummaryDialog();
+    } else if (!dom.voidDialog.hidden) {
+      closeDeleteDialog();
+    }
   }
 
   if (event.key !== 'Tab') {
@@ -700,6 +803,7 @@ function initNavigationForUser(user) {
 
 function setBudinesAccess(allowed) {
   document.body.dataset.budinesAccess = allowed ? 'true' : 'false';
+  dom.ownerSummaryButton.hidden = !allowed;
   if (allowed) {
     attachBudinesPanel();
     return;
@@ -729,6 +833,8 @@ function hideToolPanels() {
 }
 
 function clearBudinesData() {
+  closeOwnerSummaryDialog({ restoreFocus: false });
+  dom.ownerSummaryButton.hidden = true;
   setSummaryTotal('$ 0');
   renderSummaryProgress(null);
   dom.summaryLines.replaceChildren();
