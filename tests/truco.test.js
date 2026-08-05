@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import sharp from 'sharp';
 import {
   applyScoreChange,
+  canUseJoint,
   createBoardGroups,
   createDefaultTrucoState,
   createStickPattern,
@@ -54,7 +55,7 @@ describe('Truco a 30', () => {
   it('descarta datos corruptos y persiste cambios locales', () => {
     setupDom();
     window.localStorage.setItem('budines.truco.v1', '{"scores":{"nosotros":99,"ellos":0},"history":[]}');
-    initTruco();
+    initOwnerTruco();
 
     expect(document.querySelector('[data-truco-team="nosotros"] [data-truco-score]').textContent).toBe('0');
     document.querySelector('[data-truco-team-target="nosotros"][data-truco-action="add"]').click();
@@ -65,11 +66,11 @@ describe('Truco a 30', () => {
 
   it('usa Joint como modelo predeterminado y marca aria-pressed', () => {
     setupDom();
-    initTruco();
+    initOwnerTruco();
 
     addPoints('nosotros', 5);
 
-    expect(sanitizeTrucoVisualModel('humo-raro')).toBe(DEFAULT_TRUCO_VISUAL_MODEL);
+    expect(sanitizeTrucoVisualModel('humo-raro', { jointAllowed: true })).toBe(DEFAULT_TRUCO_VISUAL_MODEL);
     expect(document.querySelector('#truco-tool').dataset.trucoVisualModel).toBe('joint');
     expect(visualButton('joint').getAttribute('aria-pressed')).toBe('true');
     expect(visualButton('smoke').getAttribute('aria-pressed')).toBe('false');
@@ -78,9 +79,85 @@ describe('Truco a 30', () => {
     );
   });
 
+  it.each(['santi', 'leandro'])('%s puede alternar Smoke y Joint y conservar la preferencia', (userId) => {
+    setupDom();
+    const truco = initTruco(undefined, { id: userId });
+
+    expect(canUseJoint(userId)).toBe(true);
+    expect(visualButton('joint')).not.toBeNull();
+    expect(visualButton('joint').disabled).toBe(false);
+    truco.setVisualModel('smoke');
+    expect(window.localStorage.getItem(TRUCO_VISUAL_STORAGE_KEY)).toBe('smoke');
+    truco.setVisualModel('joint');
+    expect(truco.getVisualModel()).toBe('joint');
+    expect(window.localStorage.getItem(TRUCO_VISUAL_STORAGE_KEY)).toBe('joint');
+  });
+
+  it.each([' SANTI ', 'sAnTi', ' LEANDRO ', 'LeAnDrO'])(
+    'normaliza el usuario autorizado %j antes de validar Joint',
+    (username) => {
+      setupDom();
+      const truco = initTruco(undefined, { id: username });
+
+      expect(canUseJoint(username)).toBe(true);
+      expect(truco.getVisualModel()).toBe('joint');
+      expect(visualButton('joint')).not.toBeNull();
+    }
+  );
+
+  it('fuerza Smoke para usuarios no autorizados en UI, eventos, estado, persistencia y nueva partida', () => {
+    setupDom({ visualModel: 'joint' });
+    const jointButton = visualButton('joint');
+    const truco = initTruco(undefined, { id: 'usuario-comun', displayName: 'Santi' });
+
+    expect(canUseJoint('usuario-comun')).toBe(false);
+    expect(truco.getVisualModel()).toBe('smoke');
+    expect(document.querySelector('#truco-tool').dataset.trucoJointAllowed).toBe('false');
+    expect(visualButton('joint')).toBeNull();
+    expect(jointButton.disabled).toBe(true);
+    expect(visualButton('smoke').hidden).toBe(false);
+    expect(visualButton('smoke').getAttribute('aria-pressed')).toBe('true');
+    expect(window.localStorage.getItem(TRUCO_VISUAL_STORAGE_KEY)).toBe('smoke');
+
+    jointButton.disabled = false;
+    jointButton.dispatchEvent(new windowRef.MouseEvent('click'));
+    truco.setVisualModel('joint');
+    dispatchSwipe(board(), { startX: 120, startY: 180, endX: 230, endY: 187 });
+    truco.reset();
+
+    expect(truco.getVisualModel()).toBe('smoke');
+    expect(visualButton('joint')).toBeNull();
+    expect(window.localStorage.getItem(TRUCO_VISUAL_STORAGE_KEY)).toBe('smoke');
+  });
+
+  it('aplica Smoke sin usuario identificado y no deja Joint en el DOM', () => {
+    setupDom({ visualModel: 'joint' });
+    const truco = initTruco(undefined, null);
+
+    expect(canUseJoint(null)).toBe(false);
+    expect(truco.getVisualModel()).toBe('smoke');
+    expect(visualButton('joint')).toBeNull();
+    expect(window.localStorage.getItem(TRUCO_VISUAL_STORAGE_KEY)).toBe('smoke');
+  });
+
+  it('corrige Joint persistido para un usuario no autorizado y conserva Smoke al recargar', () => {
+    setupDom({ visualModel: 'joint' });
+    initTruco(undefined, { id: 'usuario-real' });
+
+    expect(window.localStorage.getItem(TRUCO_VISUAL_STORAGE_KEY)).toBe('smoke');
+
+    windowRef.close();
+    setupDom({ visualModel: 'smoke' });
+    const truco = initTruco(undefined, { id: 'usuario-real' });
+
+    expect(truco.getVisualModel()).toBe('smoke');
+    expect(visualButton('joint')).toBeNull();
+    expect(visualButton('smoke').getAttribute('aria-pressed')).toBe('true');
+  });
+
   it('seleccionar Smoke y Joint actualiza puntos visibles sin alterar puntaje ni historial', () => {
     setupDom();
-    initTruco();
+    initOwnerTruco();
 
     addPoints('nosotros', 18);
     addPoints('ellos', 12);
@@ -116,20 +193,20 @@ describe('Truco a 30', () => {
 
   it('restaura la preferencia visual al recargar y valida valores corruptos', () => {
     setupDom();
-    initTruco();
+    initOwnerTruco();
     visualButton('smoke').click();
     const storedVisualModel = window.localStorage.getItem(TRUCO_VISUAL_STORAGE_KEY);
 
     windowRef.close();
     setupDom({ visualModel: storedVisualModel });
-    initTruco();
+    initOwnerTruco();
 
     expect(document.querySelector('#truco-tool').dataset.trucoVisualModel).toBe('smoke');
     expect(visualButton('smoke').getAttribute('aria-pressed')).toBe('true');
 
     windowRef.close();
     setupDom({ visualModel: 'ceniza' });
-    initTruco();
+    initOwnerTruco();
 
     expect(document.querySelector('#truco-tool').dataset.trucoVisualModel).toBe('joint');
     expect(visualButton('joint').getAttribute('aria-pressed')).toBe('true');
@@ -137,7 +214,7 @@ describe('Truco a 30', () => {
 
   it('el swipe horizontal cambia modelo y el movimiento vertical o controles no lo disparan', () => {
     setupDom();
-    initTruco();
+    initOwnerTruco();
 
     addPoints('nosotros', 5);
     dispatchSwipe(board(), { startX: 230, startY: 180, endX: 120, endY: 188 });
@@ -164,7 +241,7 @@ describe('Truco a 30', () => {
 
   it('renderiza los palitos con el asset activo limpio y decorativo', () => {
     setupDom();
-    initTruco();
+    initOwnerTruco();
 
     for (let index = 0; index < 5; index += 1) {
       document.querySelector('[data-truco-team-target="nosotros"][data-truco-action="add"]').click();
@@ -185,7 +262,7 @@ describe('Truco a 30', () => {
 
   it('mantiene controles externos y seis grupos por equipo', () => {
     setupDom();
-    initTruco();
+    initOwnerTruco();
 
     const board = document.querySelector('[data-truco-board]');
     const columns = [...board.children];
@@ -209,7 +286,7 @@ describe('Truco a 30', () => {
 
   it('mantiene el puntaje total numerico fuera del marcador visual', () => {
     setupDom();
-    initTruco();
+    initOwnerTruco();
 
     addPoints('nosotros', 8);
 
@@ -229,7 +306,7 @@ describe('Truco a 30', () => {
     [30, [5, 5, 5, 5, 5, 5]]
   ])('renderiza %i puntos con imagenes reales de Joint por defecto', (score, expectedGroups) => {
     setupDom();
-    initTruco();
+    initOwnerTruco();
 
     addPoints('nosotros', score);
 
@@ -242,7 +319,7 @@ describe('Truco a 30', () => {
 
   it('cada grupo completo tiene cuatro elementos base y uno diagonal', () => {
     setupDom();
-    initTruco();
+    initOwnerTruco();
 
     addPoints('nosotros', 15);
 
@@ -260,7 +337,7 @@ describe('Truco a 30', () => {
 
   it('restar y deshacer actualizan las imagenes del modelo activo', () => {
     setupDom();
-    initTruco();
+    initOwnerTruco();
     visualButton('smoke').click();
 
     addPoints('nosotros', 3);
@@ -284,7 +361,7 @@ describe('Truco a 30', () => {
 
   it('Nosotros y Ellos mantienen imagenes independientes', () => {
     setupDom();
-    initTruco();
+    initOwnerTruco();
 
     addPoints('nosotros', 3);
     addPoints('ellos', 5);
@@ -297,7 +374,7 @@ describe('Truco a 30', () => {
 
   it('conserva separacion visual despues de los primeros 15', () => {
     setupDom();
-    initTruco();
+    initOwnerTruco();
 
     const field = document.querySelector('[data-truco-team="nosotros"]');
     const sections = [...field.querySelectorAll('.fifteen-section')];
@@ -310,7 +387,7 @@ describe('Truco a 30', () => {
 
   it('cancela y confirma nueva partida con modal', () => {
     setupDom();
-    initTruco();
+    initOwnerTruco();
 
     document.querySelector('[data-truco-team-target="nosotros"][data-truco-action="add"]').click();
     document.querySelector('#truco-reset').click();
@@ -391,12 +468,28 @@ describe('Truco a 30', () => {
       alphaAt(info.width - 1, info.height - 1)
     ].every((alpha) => alpha === 0)).toBe(true);
   });
+
+  it('versiona app y Truco en el service worker para actualizar la PWA instalada', () => {
+    const html = readFileSync('public/index.html', 'utf8');
+    const app = readFileSync('public/js/app.js', 'utf8');
+    const serviceWorker = readFileSync('public/sw.js', 'utf8');
+
+    expect(html).toContain('/js/app.js?v=joint-access-20260805');
+    expect(app).toContain("./truco.js?v=joint-access-20260805");
+    expect(serviceWorker).toContain("budines-shell-v34-joint-access");
+    expect(serviceWorker).toContain('/js/app.js?v=joint-access-20260805');
+    expect(serviceWorker).toContain('/js/truco.js?v=joint-access-20260805');
+  });
 });
 
 function addPoints(team, count) {
   for (let index = 0; index < count; index += 1) {
     document.querySelector(`[data-truco-team-target="${team}"][data-truco-action="add"]`).click();
   }
+}
+
+function initOwnerTruco(userId = 'santi') {
+  return initTruco(undefined, { id: userId });
 }
 
 function allTallyImages(team) {

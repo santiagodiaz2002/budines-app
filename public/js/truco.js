@@ -3,6 +3,7 @@ import { getStorage, scopedStorageKey } from './local-storage.js?v=auth-20260723
 const STORAGE_KEY = 'budines.truco.v1';
 export const TRUCO_VISUAL_STORAGE_KEY = 'budines.truco.visual.v1';
 export const DEFAULT_TRUCO_VISUAL_MODEL = 'joint';
+const JOINT_ALLOWED_USERS = new Set(['santi', 'leandro']);
 export const TRUCO_VISUAL_MODELS = Object.freeze({
   joint: Object.freeze({
     id: 'joint',
@@ -81,8 +82,15 @@ export function sanitizeTrucoState(value) {
   };
 }
 
-export function sanitizeTrucoVisualModel(value) {
-  return Object.prototype.hasOwnProperty.call(TRUCO_VISUAL_MODELS, value) ? value : DEFAULT_TRUCO_VISUAL_MODEL;
+export function canUseJoint(username) {
+  return JOINT_ALLOWED_USERS.has(String(username ?? '').trim().toLowerCase());
+}
+
+export function sanitizeTrucoVisualModel(value, { jointAllowed = false } = {}) {
+  const normalized = Object.prototype.hasOwnProperty.call(TRUCO_VISUAL_MODELS, value)
+    ? value
+    : DEFAULT_TRUCO_VISUAL_MODEL;
+  return normalized === 'joint' && !jointAllowed ? 'smoke' : normalized;
 }
 
 export function applyScoreChange(state, team, delta) {
@@ -150,7 +158,7 @@ export function createBoardGroups(score) {
   });
 }
 
-export function initTruco(root = document.querySelector('#truco-tool')) {
+export function initTruco(root = document.querySelector('#truco-tool'), authenticatedUser = null) {
   if (!root) {
     return null;
   }
@@ -169,6 +177,7 @@ export function initTruco(root = document.querySelector('#truco-tool')) {
     winner: root.querySelector('#truco-winner'),
     undo: root.querySelector('#truco-undo'),
     reset: root.querySelector('#truco-reset'),
+    visualToggle: root.querySelector('.truco-visual-toggle'),
     visualButtons: [...root.querySelectorAll('[data-truco-visual]')],
     board: root.querySelector('[data-truco-board]'),
     dialog: document.querySelector('#truco-reset-dialog'),
@@ -177,10 +186,11 @@ export function initTruco(root = document.querySelector('#truco-tool')) {
   };
 
   let state = readState();
-  let visualModel = readVisualModel();
+  let jointAllowed = canUseJoint(authenticatedUser?.id);
+  let visualModel = readVisualModel(jointAllowed);
   let swipeStart = null;
 
-  preloadTallyAssets();
+  preloadTallyAssets(jointAllowed);
 
   root.addEventListener('click', (event) => {
     const scoreButton = event.target.closest('[data-truco-action]');
@@ -245,14 +255,14 @@ export function initTruco(root = document.querySelector('#truco-tool')) {
   }
 
   function setVisualModel(value) {
-    const nextModel = sanitizeTrucoVisualModel(value);
+    const nextModel = sanitizeTrucoVisualModel(value, { jointAllowed });
+    persistVisualModel(nextModel, jointAllowed);
     if (visualModel === nextModel) {
       renderVisualControls();
       return;
     }
 
     visualModel = nextModel;
-    persistVisualModel(visualModel);
     render();
   }
 
@@ -335,7 +345,7 @@ export function initTruco(root = document.querySelector('#truco-tool')) {
       for (const groupRoot of teamRoot.querySelectorAll('[data-truco-group]')) {
         const groupIndex = Number(groupRoot.dataset.trucoGroup);
         const group = groups[groupIndex] || { vertical: 0, diagonal: false };
-        groupRoot.replaceChildren(...createStickNodes(group, visualModel));
+        groupRoot.replaceChildren(...createStickNodes(group, visualModel, jointAllowed));
         groupRoot.setAttribute(
           'aria-label',
           `${DEFAULT_TEAMS[team]} puntos ${groupIndex * 5 + 1} a ${groupIndex * 5 + 5}: ${groupPoints(group)}`
@@ -355,6 +365,19 @@ export function initTruco(root = document.querySelector('#truco-tool')) {
 
   function renderVisualControls() {
     root.dataset.trucoVisualModel = visualModel;
+    root.dataset.trucoJointAllowed = jointAllowed ? 'true' : 'false';
+
+    const jointButton = dom.visualButtons.find((button) => button.dataset.trucoVisual === 'joint');
+    const smokeButton = dom.visualButtons.find((button) => button.dataset.trucoVisual === 'smoke');
+    if (jointButton) {
+      jointButton.disabled = !jointAllowed;
+      if (jointAllowed && !jointButton.isConnected) {
+        dom.visualToggle?.insertBefore(jointButton, smokeButton || null);
+      } else if (!jointAllowed) {
+        jointButton.remove();
+      }
+    }
+
     for (const button of dom.visualButtons) {
       const pressed = button.dataset.trucoVisual === visualModel;
       button.setAttribute('aria-pressed', pressed ? 'true' : 'false');
@@ -367,16 +390,25 @@ export function initTruco(root = document.querySelector('#truco-tool')) {
     getState: () => structuredClone(state),
     getVisualModel: () => visualModel,
     setVisualModel,
+    setAuthenticatedUser(user) {
+      jointAllowed = canUseJoint(user?.id);
+      state = readState();
+      visualModel = readVisualModel(jointAllowed);
+      preloadTallyAssets(jointAllowed);
+      render();
+    },
     reset() {
       state = resetTrucoState();
       persistState(state);
+      visualModel = sanitizeTrucoVisualModel(visualModel, { jointAllowed });
+      persistVisualModel(visualModel, jointAllowed);
       render();
     }
   };
 }
 
-function createStickNodes(group, visualModel = DEFAULT_TRUCO_VISUAL_MODEL) {
-  const model = TRUCO_VISUAL_MODELS[sanitizeTrucoVisualModel(visualModel)];
+function createStickNodes(group, visualModel = DEFAULT_TRUCO_VISUAL_MODEL, jointAllowed = false) {
+  const model = TRUCO_VISUAL_MODELS[sanitizeTrucoVisualModel(visualModel, { jointAllowed })];
   const nodes = [];
 
   for (let index = 0; index < group.vertical; index += 1) {
@@ -424,11 +456,18 @@ function readState() {
   }
 }
 
-function readVisualModel() {
+function readVisualModel(jointAllowed) {
   try {
-    return sanitizeTrucoVisualModel(getStorage()?.getItem(scopedStorageKey(TRUCO_VISUAL_STORAGE_KEY)));
+    const storage = getStorage();
+    const key = scopedStorageKey(TRUCO_VISUAL_STORAGE_KEY);
+    const storedValue = storage?.getItem(key);
+    const sanitizedValue = sanitizeTrucoVisualModel(storedValue, { jointAllowed });
+    if (storage && storedValue !== sanitizedValue) {
+      storage.setItem(key, sanitizedValue);
+    }
+    return sanitizedValue;
   } catch {
-    return DEFAULT_TRUCO_VISUAL_MODEL;
+    return sanitizeTrucoVisualModel(DEFAULT_TRUCO_VISUAL_MODEL, { jointAllowed });
   }
 }
 
@@ -436,17 +475,19 @@ function persistState(state) {
   getStorage()?.setItem(scopedStorageKey(STORAGE_KEY), JSON.stringify(state));
 }
 
-function persistVisualModel(value) {
-  getStorage()?.setItem(scopedStorageKey(TRUCO_VISUAL_STORAGE_KEY), sanitizeTrucoVisualModel(value));
+function persistVisualModel(value, jointAllowed) {
+  const sanitizedValue = sanitizeTrucoVisualModel(value, { jointAllowed });
+  getStorage()?.setItem(scopedStorageKey(TRUCO_VISUAL_STORAGE_KEY), sanitizedValue);
 }
 
-function preloadTallyAssets() {
+function preloadTallyAssets(jointAllowed) {
   const ImageClass = globalThis.Image || globalThis.window?.Image;
   if (!ImageClass) {
     return;
   }
 
-  for (const model of Object.values(TRUCO_VISUAL_MODELS)) {
+  const models = jointAllowed ? Object.values(TRUCO_VISUAL_MODELS) : [TRUCO_VISUAL_MODELS.smoke];
+  for (const model of models) {
     const image = new ImageClass();
     image.decoding = 'async';
     image.src = model.src;

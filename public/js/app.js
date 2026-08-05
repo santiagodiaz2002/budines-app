@@ -19,7 +19,7 @@ import {
 import { createAudioCoordinator } from './audio-coordinator.js';
 import { initMetronome } from './metronome-editor.js?v=redesign13-20260730';
 import { initToolNavigation } from './navigation.js?v=redesign13-20260730';
-import { initTruco } from './truco.js?v=auth-20260723';
+import { initTruco } from './truco.js?v=joint-access-20260805';
 import { initTuner } from './tuner.js?v=redesign13-20260730';
 import { clearLocalStorageUser, setLocalStorageUser } from './local-storage.js?v=auth-20260723';
 import { parsePositiveIntegerText, validateSaleFields } from './validation.js?v=quantity-20260723';
@@ -117,6 +117,7 @@ const state = {
   tools: {
     initialized: false,
     navigation: null,
+    truco: null,
     metronome: null,
     tuner: null
   }
@@ -746,7 +747,7 @@ async function showApp(user) {
   state.user = user;
   setLocalStorageUser(user);
   setBudinesAccess(Boolean(user.capabilities?.canAccessBudines));
-  initLocalTools();
+  initLocalTools(user);
   initNavigationForUser(user);
 
   document.body.dataset.authState = 'app';
@@ -766,13 +767,14 @@ async function showApp(user) {
   }
 }
 
-function initLocalTools() {
+function initLocalTools(user) {
   if (state.tools.initialized) {
+    state.tools.truco?.setAuthenticatedUser?.(user);
     return;
   }
 
   const audioCoordinator = createAudioCoordinator();
-  initToolSafely('truco', () => initTruco());
+  state.tools.truco = initToolSafely('truco', () => initTruco(document.querySelector('#truco-tool'), user));
   state.tools.metronome = initToolSafely('metrónomo', () =>
     initMetronome(document.querySelector('#metronome-tool'), audioCoordinator)
   );

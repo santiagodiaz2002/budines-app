@@ -40,6 +40,7 @@ Cambiar de pestaña no recarga la página. Budines conserva autenticación, D1, 
 - Nueva partida requiere confirmación en modal.
 - Puntajes e historial se guardan en `localStorage`; datos corruptos se descartan.
 - Cada punto se representa con una instancia decorativa del modelo visual elegido: `public/media/joint-clean.png` o `public/media/smoke.png`. Los bloques de cinco usan cuatro imágenes verticales y una diagonal.
+- Las sesiones canónicas `santi` y `leandro` pueden alternar entre `Joint` y `Smoke`; cualquier otra sesión ve y conserva únicamente `Smoke`, incluso si tenía `Joint` guardado previamente.
 
 ### Metrónomo
 
@@ -231,7 +232,7 @@ Validación completa:
 npm run validate
 ```
 
-Las pruebas cubren regresión de Budines, navegación de las cuatro pestañas, reglas de Truco, representación con Joint, canciones guardadas del metrónomo, bloques nombrados, cuenta previa, máquina de reproducción, selección de voz, conversión/detección del afinador y liberación de pistas. La calidad acústica final del metrónomo, la voz hablada y el afinador debe comprobarse en un dispositivo físico con parlante y micrófono.
+Las pruebas cubren regresión de Budines, navegación de las cuatro pestañas, reglas de Truco, permisos y representación con Joint/Smoke, canciones guardadas del metrónomo, bloques nombrados, cuenta previa, máquina de reproducción, selección de voz, conversión/detección del afinador y liberación de pistas. La calidad acústica final del metrónomo, la voz hablada y el afinador debe comprobarse en un dispositivo físico con parlante y micrófono.
 
 ## Despliegue en Cloudflare Pages
 

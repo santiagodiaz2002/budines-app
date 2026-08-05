@@ -1281,6 +1281,10 @@ body[data-active-tool="truco"] .topbar {
   background: var(--color-bg-deep);
 }
 
+#truco-tool[data-truco-joint-allowed="false"] .truco-visual-toggle {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .truco-visual-option {
   position: relative;
   min-width: 0;

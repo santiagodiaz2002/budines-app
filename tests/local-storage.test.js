@@ -39,7 +39,7 @@ describe('localStorage por usuario', () => {
     setLocalStorageUser(commonUser('comun'));
     const scopedKey = scopedStorageKey(TRUCO_KEY);
 
-    initTruco();
+    initTruco(undefined, { id: 'comun' });
     document.querySelector('[data-truco-team-target="nosotros"][data-truco-action="add"]').click();
 
     expect(JSON.parse(windowRef.localStorage.getItem(scopedKey)).scores.nosotros).toBe(1);

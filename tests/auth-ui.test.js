@@ -81,12 +81,16 @@ describe('pantalla de acceso y permisos de UI', () => {
     expect(fetchCalls.some((call) => call.path === '/api/records')).toBe(false);
     expect(document.querySelector('#session-badge').textContent).toBe('Comun');
     expect(document.querySelector('#user-session').textContent).not.toContain('common');
+    expect(document.querySelector('[data-truco-visual="joint"]')).toBeNull();
+    expect(document.querySelector('[data-truco-visual="smoke"]').hidden).toBe(false);
+    expect(document.querySelector('#truco-tool').dataset.trucoVisualModel).toBe('smoke');
+    expect(windowRef.localStorage.getItem('budines.truco.visual.v1.user.user-common-1')).toBe('smoke');
   });
 
   it.each([
     ['santi', 'Santi'],
     ['leandro', 'Leandro']
-  ])('%s ve cuatro pestañas y carga Budines', async (id, displayName) => {
+  ])('%s ve cuatro pestañas, ambas opciones visuales y carga Budines', async (id, displayName) => {
     loginUser = {
       id,
       displayName,
@@ -125,6 +129,8 @@ describe('pantalla de acceso y permisos de UI', () => {
     expect(document.querySelector('#owner-summary-dialog').hidden).toBe(false);
     expect(document.querySelector('#owner-summary-total').textContent).toContain('3.000');
     document.querySelector('#owner-summary-close').click();
+    expect(document.querySelector('[data-truco-visual="joint"]')).not.toBeNull();
+    expect(document.querySelector('[data-truco-visual="smoke"]').hidden).toBe(false);
   });
 
   it('logout llama backend, cancela voz y vuelve al acceso', async () => {
