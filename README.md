@@ -176,7 +176,7 @@ El binding debe llamarse exactamente `DB`.
 npm run db:migrate:local
 ```
 
-Esto crea tablas, índices, usuarios comerciales permitidos, autenticación, inversión inicial de ARS 120000 y los saldos iniciales históricos. La migración `0002_remove_incorrect_62000_record.sql` da de baja lógica el saldo incorrecto de ARS 62000, por lo que el saldo inicial activo correcto queda en ARS 3000.
+Esto crea tablas, índices, usuarios comerciales permitidos, autenticación y los datos históricos. El período anterior comenzó con una inversión de ARS 120000 y un saldo inicial correcto de ARS 3000; `0002_remove_incorrect_62000_record.sql` conserva pero da de baja lógica el saldo incorrecto de ARS 62000. La migración `0006_start_profit_period.sql` cierra todos los registros que seguían activos, pone la inversión en ARS 0 e inicia el período actual con los totales en cero.
 
 ## Seed de cuentas propietarias
 
@@ -268,19 +268,21 @@ En cada iPhone:
 4. Confirmar el nombre `Budines`.
 5. Abrir desde el icono instalado y verificar modo standalone.
 
-## Verificación del saldo inicial activo de ARS 3000
+## Verificación del período actual en cero
 
 Después de aplicar todas las migraciones:
 
 ```bash
-npx wrangler d1 execute budines --local --command "SELECT r.id, r.amount_ars, r.type, r.grams, r.user_id, r.commercial_date, r.status, rd.deleted_at FROM records r LEFT JOIN record_deletions rd ON rd.record_id = r.id ORDER BY r.id;"
+npx wrangler d1 execute budines --local --command "SELECT key, value FROM config WHERE key IN ('initial_investment_ars', 'profit_period_closed_through_record_rowid') ORDER BY key; SELECT r.id, r.amount_ars, r.type, r.status, rd.deleted_at, rd.reason FROM records r LEFT JOIN record_deletions rd ON rd.record_id = r.id ORDER BY r.rowid;"
 ```
 
 Resultado esperado:
 
-- La fila `saldo-inicial-ars-3000` sigue activa, sin gramos, sin usuario, sin fecha comercial y sin baja lógica.
-- La fila `saldo-inicial-ars-62000` sigue existiendo, pero aparece en `record_deletions`.
-- Resumen inicial correcto: total ARS 3000, inversión ARS 120000, falta recuperar ARS 117000.
+- `initial_investment_ars` vale `0`.
+- Las filas `saldo-inicial-ars-3000` y `saldo-inicial-ars-62000` siguen existiendo físicamente y aparecen en `record_deletions`, igual que el resto de los registros que estaban activos al cerrar el período anterior.
+- `profit_period_closed_through_record_rowid` guarda la frontera técnica del cierre para que reintentar la migración no excluya ventas posteriores.
+- Estado inmediatamente posterior al cierre: total ARS 0, Santi ARS 0, Leandro ARS 0, inversión ARS 0 y ganancia ARS 0.
+- Una venta creada después de la migración aparece en el listado, suma solo a su propietario y cuenta íntegramente como ganancia.
 
 ## Consulta de registros
 
@@ -357,7 +359,7 @@ npx wrangler d1 export budines --local --output=budines-local-backup.sql
 6. `/api/health` responde en producción.
 7. Login de Santi funciona.
 8. Login de Leandro funciona.
-9. Resumen inicial muestra ARS 3000, ARS 120000 y ARS 117000.
+9. El período actual comienza con total, Santi, Leandro, inversión y ganancia en ARS 0.
 10. Una venta nueva actualiza resumen y registros.
 11. Repetir una petición con la misma clave no duplica.
 12. Eliminar una venta excluye el importe del resumen.

@@ -15,9 +15,11 @@
 - La app se llama Budines y usa español de Argentina.
 - Usuarios permitidos: Santi y Leandro.
 - La identidad confiable se deriva únicamente de la sesión del servidor.
-- La inversión inicial persistente es ARS 120000.
-- El saldo inicial activo correcto es ARS 3000.
+- El período actual comienza con `initial_investment_ars = 0`; todo importe nuevo activo es ganancia.
+- La inversión de ARS 120000 y el saldo inicial correcto de ARS 3000 pertenecen al período histórico cerrado por `0006_start_profit_period.sql`.
 - La fila histórica `saldo-inicial-ars-62000` existe, pero está dada de baja lógica por la migración `0002_remove_incorrect_62000_record.sql`.
+- La migración `0006_start_profit_period.sql` conserva todas las filas anteriores, las excluye mediante `record_deletions` y deja total general, Santi y Leandro en ARS 0.
+- La frontera persistida por `0006_start_profit_period.sql` impide que un reintento excluya ventas creadas después del cierre.
 - El total acumulado se calcula solo con registros activos.
 - Los registros anulados no cuentan en el resumen.
 - Ventas y saldos iniciales activos pueden eliminarse desde la interfaz mediante baja lógica confirmada.
