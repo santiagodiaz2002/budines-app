@@ -13,12 +13,13 @@ afterEach(() => {
   db = null;
 });
 
-describe('migracion 0004_add_quantity_unit', () => {
-  it('interpreta registros existentes como GR y guarda nuevas ventas AP', async () => {
+describe('compatibilidad de 0004_add_quantity_unit', () => {
+  it('interpreta registros históricos como GR y guarda ventas nuevas NORM sin reescribirlos', async () => {
     db = new DatabaseSync(':memory:');
     db.exec(readFileSync('migrations/0001_initial.sql', 'utf8'));
     db.exec(readFileSync('migrations/0002_remove_incorrect_62000_record.sql', 'utf8'));
     db.exec(readFileSync('migrations/0004_add_quantity_unit.sql', 'utf8'));
+    db.exec(readFileSync('migrations/0007_add_operations.sql', 'utf8'));
 
     const repo = createD1Repository(wrapD1(db));
     const before = await getSummary(repo);
@@ -30,8 +31,8 @@ describe('migracion 0004_add_quantity_unit', () => {
     const created = await createSale(
       repo,
       {
-        grams: '12',
-        quantityUnit: 'AP',
+        quantity: '12',
+        quantityUnit: 'NORM',
         amountArs: '5000',
         idempotencyKey: 'idem-migration-ap'
       },
@@ -42,11 +43,14 @@ describe('migracion 0004_add_quantity_unit', () => {
     const listed = await repo.listRecords(10, 0);
 
     expect(created.record).toMatchObject({
-      grams: 12,
-      quantityUnit: 'AP',
+      quantity: 12,
+      quantityUnit: 'NORM',
       amountArs: 5000
     });
-    expect(listed.find((record) => record.id === 'saldo-inicial-ars-3000').quantityUnit).toBe('GR');
+    expect(listed.find((record) => record.id === 'saldo-inicial-ars-3000')).toMatchObject({
+      quantity: null,
+      quantityUnit: 'GR'
+    });
     expect(after.totalArs).toBe(before.totalArs + 5000);
     expect(after.missingArs).toBe(112000);
   });

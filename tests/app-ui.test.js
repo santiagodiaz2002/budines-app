@@ -21,7 +21,8 @@ beforeEach(async () => {
       id: 'saldo-inicial-ars-3000',
       type: 'saldo_inicial',
       status: 'activo',
-      grams: null,
+      quantity: null,
+      quantityUnit: 'GR',
       amountArs: 3000,
       user: null,
       commercialDate: null,
@@ -92,6 +93,7 @@ afterEach(() => {
 describe('interfaz de carga de Budines', () => {
   it('navega los subtabs con flechas, Home y End', async () => {
     const entryTab = document.querySelector('#show-entry');
+    const withdrawalTab = document.querySelector('#show-withdrawal');
     const recordsTab = document.querySelector('#show-records');
     const entrySection = document.querySelector('#entry-section');
     const recordsSection = document.querySelector('#records-section');
@@ -103,23 +105,24 @@ describe('interfaz de carga de Budines', () => {
       cancelable: true
     }));
 
-    expect(entryTab.getAttribute('aria-selected')).toBe('true');
+    expect(withdrawalTab.getAttribute('aria-selected')).toBe('true');
     expect(recordsTab.getAttribute('aria-selected')).toBe('false');
-    expect(entryTab.tabIndex).toBe(0);
+    expect(entryTab.tabIndex).toBe(-1);
+    expect(withdrawalTab.tabIndex).toBe(0);
     expect(recordsTab.tabIndex).toBe(-1);
-    expect(entrySection.hidden).toBe(false);
+    expect(entrySection.hidden).toBe(true);
     expect(recordsSection.hidden).toBe(true);
-    expect(document.activeElement).toBe(entryTab);
+    expect(document.activeElement).toBe(withdrawalTab);
 
-    entryTab.dispatchEvent(new windowRef.KeyboardEvent('keydown', {
-      key: 'ArrowRight',
+    withdrawalTab.dispatchEvent(new windowRef.KeyboardEvent('keydown', {
+      key: 'ArrowLeft',
       bubbles: true,
       cancelable: true
     }));
 
-    expect(recordsTab.getAttribute('aria-selected')).toBe('true');
-    expect(recordsSection.hidden).toBe(false);
-    expect(document.activeElement).toBe(recordsTab);
+    expect(entryTab.getAttribute('aria-selected')).toBe('true');
+    expect(entrySection.hidden).toBe(false);
+    expect(document.activeElement).toBe(entryTab);
 
     recordsTab.dispatchEvent(new windowRef.KeyboardEvent('keydown', {
       key: 'Home',
@@ -141,55 +144,57 @@ describe('interfaz de carga de Budines', () => {
     await waitFor(() => document.querySelectorAll('[data-record-card]').length === records.length);
   });
 
-  it('usa GR como unidad inicial y permite guardar GR', async () => {
+  it('usa NORM como tipo inicial y permite guardar NORM', async () => {
     document.querySelector('#show-entry').click();
 
-    expect(document.querySelector('#quantity-unit-gr').getAttribute('aria-pressed')).toBe('true');
-    expect(document.querySelector('#quantity-unit-ap').getAttribute('aria-pressed')).toBe('false');
+    expect(document.querySelector('#quantity-unit-norm').getAttribute('aria-pressed')).toBe('true');
+    expect(document.querySelector('#quantity-unit-gen').getAttribute('aria-pressed')).toBe('false');
 
-    document.querySelector('#grams-input').value = '350';
+    document.querySelector('#quantity-input').value = '350';
     document.querySelector('#amount-input').value = '7000';
     document.querySelector('#sale-form').dispatchEvent(new windowRef.Event('submit', { bubbles: true, cancelable: true }));
 
     await waitFor(() => createCalls.length === 1);
 
     expect(createCalls[0]).toMatchObject({
-      grams: '350',
-      quantityUnit: 'GR',
+      type: 'venta',
+      quantity: '350',
+      quantityUnit: 'NORM',
       amountArs: '7000'
     });
     expect(summary.totalArs).toBe(10000);
 
     document.querySelector('#show-records').click();
-    await waitFor(() => document.querySelector('#records-list').textContent.includes('350 GR'));
-    expect(document.querySelector('#records-list').textContent).toContain('350 GR');
+    await waitFor(() => document.querySelector('#records-list').textContent.includes('350 NORM'));
+    expect(document.querySelector('#records-list').textContent).toContain('350 NORM');
   });
 
-  it('cambia a AP, guarda AP y vuelve el selector a GR', async () => {
+  it('cambia a GEN, guarda GEN y vuelve el selector a NORM', async () => {
     document.querySelector('#show-entry').click();
-    document.querySelector('#quantity-unit-ap').click();
+    document.querySelector('#quantity-unit-gen').click();
 
-    expect(document.querySelector('#quantity-unit-gr').getAttribute('aria-pressed')).toBe('false');
-    expect(document.querySelector('#quantity-unit-ap').getAttribute('aria-pressed')).toBe('true');
+    expect(document.querySelector('#quantity-unit-norm').getAttribute('aria-pressed')).toBe('false');
+    expect(document.querySelector('#quantity-unit-gen').getAttribute('aria-pressed')).toBe('true');
 
-    document.querySelector('#grams-input').value = '12';
+    document.querySelector('#quantity-input').value = '12';
     document.querySelector('#amount-input').value = '5000';
     document.querySelector('#sale-form').dispatchEvent(new windowRef.Event('submit', { bubbles: true, cancelable: true }));
 
     await waitFor(() => createCalls.length === 1);
 
     expect(createCalls[0]).toMatchObject({
-      grams: '12',
-      quantityUnit: 'AP',
+      type: 'venta',
+      quantity: '12',
+      quantityUnit: 'GEN',
       amountArs: '5000'
     });
-    await waitFor(() => document.querySelector('#quantity-unit-gr').getAttribute('aria-pressed') === 'true');
-    expect(document.querySelector('#quantity-unit-gr').getAttribute('aria-pressed')).toBe('true');
+    await waitFor(() => document.querySelector('#quantity-unit-norm').getAttribute('aria-pressed') === 'true');
+    expect(document.querySelector('#quantity-unit-norm').getAttribute('aria-pressed')).toBe('true');
     expect(summary.totalArs).toBe(8000);
 
     document.querySelector('#show-records').click();
-    await waitFor(() => document.querySelector('#records-list').textContent.includes('12 AP'));
-    expect(document.querySelector('#records-list').textContent).toContain('12 AP');
+    await waitFor(() => document.querySelector('#records-list').textContent.includes('12 GEN'));
+    expect(document.querySelector('#records-list').textContent).toContain('12 GEN');
   });
 
   it('muestra registros antiguos sin unidad como GR', async () => {
@@ -198,7 +203,8 @@ describe('interfaz de carga de Budines', () => {
         id: 'venta-vieja-sin-unidad',
         type: 'venta',
         status: 'activo',
-        grams: 350,
+        quantity: 350,
+        quantityUnit: 'GR',
         amountArs: 7000,
         user: {
           id: 'santi',
@@ -217,6 +223,57 @@ describe('interfaz de carga de Budines', () => {
     expect(document.querySelector('#records-list').textContent).toContain('350 GR');
     expect(document.querySelector('#records-list').textContent).not.toContain('gramos');
     expect(document.querySelector('#records-list').textContent).not.toContain('tiros');
+  });
+
+  it('registra y conserva un retiro de Santi sin campos de cantidad', async () => {
+    summary = {
+      totalArs: 188000,
+      investmentArs: 0,
+      state: 'ganancia',
+      investmentRecovered: true,
+      missingArs: 0,
+      profitArs: 188000
+    };
+    document.querySelector('#show-withdrawal').click();
+
+    const section = document.querySelector('#withdrawal-section');
+    expect(section.hidden).toBe(false);
+    expect(section.querySelector('#quantity-input')).toBeNull();
+    expect(section.querySelector('[data-quantity-unit]')).toBeNull();
+
+    document.querySelector('#withdrawal-amount-input').value = '108000';
+    document.querySelector('#withdrawal-form').dispatchEvent(
+      new windowRef.Event('submit', { bubbles: true, cancelable: true })
+    );
+
+    await waitFor(() => createCalls.length === 1);
+    expect(createCalls[0]).toMatchObject({ type: 'retiro', amountArs: '108000' });
+    expect(createCalls[0]).not.toHaveProperty('quantity');
+    await waitFor(() => document.querySelector('#summary-lines').textContent.includes('80.000'));
+    expect(summary.profitArs).toBe(80000);
+
+    document.querySelector('#show-records').click();
+    await waitFor(() => document.querySelector('#records-list').textContent.includes('Retiro de Santi'));
+    const withdrawalCard = [...document.querySelectorAll('[data-record-card]')]
+      .find((card) => card.record.type === 'retiro');
+    expect(withdrawalCard.textContent).toContain('Retiro de Santi');
+    expect(withdrawalCard.textContent).toContain('108.000');
+    expect(withdrawalCard.textContent).not.toContain('Cantidad');
+
+    document.querySelector('#reload-records').click();
+    await waitFor(() => document.querySelector('#records-list').textContent.includes('Retiro de Santi'));
+    expect(summary.profitArs).toBe(80000);
+  });
+
+  it.each(['', '0', '-1', '1.5', 'texto'])('no envía un retiro inválido %s', async (value) => {
+    document.querySelector('#show-withdrawal').click();
+    document.querySelector('#withdrawal-amount-input').value = value;
+    document.querySelector('#withdrawal-form').dispatchEvent(
+      new windowRef.Event('submit', { bubbles: true, cancelable: true })
+    );
+
+    expect(createCalls).toHaveLength(0);
+    expect(document.querySelector('#withdrawal-error').textContent.length).toBeGreaterThan(0);
   });
 });
 
@@ -523,10 +580,10 @@ async function handleFetch(input, options = {}) {
 
     const record = {
       id: body.idempotencyKey,
-      type: 'venta',
+      type: body.type,
       status: 'activo',
-      grams: Number(body.grams),
-      quantityUnit: body.quantityUnit ?? 'GR',
+      quantity: body.type === 'venta' ? Number(body.quantity) : null,
+      quantityUnit: body.type === 'venta' ? body.quantityUnit : null,
       amountArs: Number(body.amountArs),
       user: {
         id: 'santi',
@@ -538,10 +595,15 @@ async function handleFetch(input, options = {}) {
       voidedBy: null
     };
     records = [record, ...records];
+    const direction = record.type === 'retiro' ? -1 : 1;
     summary = {
       ...summary,
-      totalArs: summary.totalArs + record.amountArs,
-      missingArs: Math.max(0, summary.missingArs - record.amountArs)
+      totalArs: summary.totalArs + direction * record.amountArs,
+      missingArs:
+        record.type === 'venta' ? Math.max(0, summary.missingArs - record.amountArs) : summary.missingArs,
+      profitArs: summary.investmentRecovered
+        ? summary.profitArs + direction * record.amountArs
+        : summary.profitArs
     };
 
     return json(

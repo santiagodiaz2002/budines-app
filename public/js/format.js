@@ -32,7 +32,8 @@ export function formatCommercialDate(dateValue) {
 }
 
 export function formatRecordType(type) {
-  return type === 'saldo_inicial' ? 'Saldo inicial' : 'Venta';
+  if (type === 'saldo_inicial') return 'Saldo inicial';
+  return type === 'retiro' ? 'Retiro' : 'Venta';
 }
 
 export function formatRecordStatus(status) {

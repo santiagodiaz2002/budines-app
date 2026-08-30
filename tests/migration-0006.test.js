@@ -18,6 +18,7 @@ describe('migración 0006_start_profit_period', () => {
     db.exec(readFileSync('migrations/0001_initial.sql', 'utf8'));
     db.exec(readFileSync('migrations/0002_remove_incorrect_62000_record.sql', 'utf8'));
     db.exec(readFileSync('migrations/0004_add_quantity_unit.sql', 'utf8'));
+    db.exec(readFileSync('migrations/0007_add_operations.sql', 'utf8'));
     insertPreviousSale({
       id: 'venta-anterior-santi',
       userId: 'santi',
@@ -52,6 +53,7 @@ describe('migración 0006_start_profit_period', () => {
 
     await expect(getSummary(repo)).resolves.toEqual({
       totalArs: 0,
+      recoveryTotalArs: 0,
       investmentArs: 0,
       state: 'recuperada',
       investmentRecovered: true,
@@ -120,8 +122,8 @@ describe('migración 0006_start_profit_period', () => {
     const created = await createSale(
       repo,
       {
-        grams: '12',
-        quantityUnit: 'AP',
+        quantity: '12',
+        quantityUnit: 'GEN',
         amountArs: '5000',
         idempotencyKey: 'idem-periodo-ganancia-leandro'
       },
@@ -141,6 +143,7 @@ describe('migración 0006_start_profit_period', () => {
     ]);
     await expect(getSummary(repo)).resolves.toEqual({
       totalArs: 5000,
+      recoveryTotalArs: 5000,
       investmentArs: 0,
       state: 'ganancia',
       investmentRecovered: true,
@@ -156,8 +159,11 @@ describe('migración 0006_start_profit_period', () => {
     db.exec(migration);
 
     expect(deletionCount()).toBe(deletionsBeforeRetry);
-    expect(activeRecordIds()).toEqual([created.record.id]);
-    expect(db.prepare('SELECT COUNT(*) AS count FROM records').get().count).toBe(5);
+    expect(activeRecordIds()).toEqual([]);
+    expect(db.prepare("SELECT id FROM operations WHERE status = 'activo'").all()).toEqual([
+      { id: created.record.id }
+    ]);
+    expect(db.prepare('SELECT COUNT(*) AS count FROM records').get().count).toBe(4);
     await expect(getSummary(repo)).resolves.toMatchObject({
       totalArs: 5000,
       investmentArs: 0,

@@ -13,8 +13,8 @@ export function serializeRecord(record) {
     id: record.id,
     type: record.type,
     status: record.status,
-    grams: record.grams,
-    quantityUnit: record.quantityUnit === 'AP' ? 'AP' : 'GR',
+    quantity: record.quantity,
+    quantityUnit: record.quantityUnit,
     amountArs: record.amountArs,
     user: record.userId
       ? {

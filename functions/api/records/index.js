@@ -1,6 +1,7 @@
 import { requireBudinesAccess } from '../../_shared/auth.js';
 import { createD1Repository } from '../../_shared/d1-repository.js';
 import {
+  ApiError,
   assertDb,
   assertSameOrigin,
   jsonResponse,
@@ -8,7 +9,7 @@ import {
   readJsonBody,
   withApiErrorHandling
 } from '../../_shared/http.js';
-import { createSale } from '../../_shared/records-service.js';
+import { createSale, createWithdrawal } from '../../_shared/records-service.js';
 import { serializeRecord } from '../../_shared/serializers.js';
 import { parsePagination } from '../../_shared/validation.js';
 
@@ -52,7 +53,7 @@ function handlePost(context) {
     const session = await requireBudinesAccess(context);
     const body = await readJsonBody(context.request);
     const repo = createD1Repository(assertDb(context.env));
-    const result = await createSale(repo, body, session.user);
+    const result = await createRecord(repo, body, session.user);
 
     return jsonResponse(
       {
@@ -63,4 +64,14 @@ function handlePost(context) {
       { status: result.kind === 'created' ? 201 : 200 }
     );
   });
+}
+
+function createRecord(repo, body, user) {
+  if (body?.type === 'venta') {
+    return createSale(repo, body, user);
+  }
+  if (body?.type === 'retiro') {
+    return createWithdrawal(repo, body, user);
+  }
+  throw new ApiError(400, 'invalid_record_type', 'El tipo debe ser venta o retiro.');
 }

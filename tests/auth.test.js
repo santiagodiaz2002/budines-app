@@ -260,7 +260,9 @@ describe('autenticación por usuario y contraseña', () => {
         cookie,
         body: {
           username: 'santi',
-          grams: '1',
+          type: 'venta',
+          quantity: '1',
+          quantityUnit: 'NORM',
           amountArs: '1000',
           idempotencyKey: 'idem-common-direct-1'
         }
@@ -361,7 +363,7 @@ describe('autenticación por usuario y contraseña', () => {
       }
     });
 
-    db.prepare('UPDATE records SET amount_ars = ? WHERE id = ?').run(4000, santiCreated.id);
+    db.prepare('UPDATE operations SET amount_ars = ? WHERE id = ?').run(4000, santiCreated.id);
 
     const updated = await ownerSummaryEndpoint({
       request: request('/api/owner-summary', { cookie: leandroCookie }),
@@ -374,6 +376,39 @@ describe('autenticación por usuario y contraseña', () => {
         leandroArs: 2500,
         totalArs: 6500
       }
+    });
+  });
+
+  it('asocia el retiro al usuario de sesión e ignora identidad enviada por el cliente', async () => {
+    const { d1, db } = createTestD1();
+    const login = await loginUser(d1, { username: 'SANTI', password: OWNER_TEST_PASSWORD });
+    const cookie = login.headers.get('Set-Cookie');
+
+    const response = await recordsEndpoint({
+      request: request('/api/records', {
+        method: 'POST',
+        cookie,
+        body: {
+          type: 'retiro',
+          userId: 'leandro',
+          amountArs: '108000',
+          idempotencyKey: 'idem-session-retiro-1'
+        }
+      }),
+      env: { DB: d1 }
+    });
+    const payload = await response.json();
+
+    expect(response.status).toBe(201);
+    expect(payload.record).toMatchObject({
+      type: 'retiro',
+      amountArs: 108000,
+      quantity: null,
+      quantityUnit: null,
+      user: { id: 'santi', displayName: 'Santi' }
+    });
+    expect(db.prepare('SELECT user_id FROM operations WHERE id = ?').get(payload.record.id)).toEqual({
+      user_id: 'santi'
     });
   });
 
@@ -403,6 +438,7 @@ function createTestD1() {
   db.exec(readFileSync('migrations/0003_password_auth.sql', 'utf8'));
   db.exec(readFileSync('migrations/0004_add_quantity_unit.sql', 'utf8'));
   db.exec(readFileSync('migrations/0005_track_password_kdf_version.sql', 'utf8'));
+  db.exec(readFileSync('migrations/0007_add_operations.sql', 'utf8'));
   insertOwner(db, 'santi', 'Santi', ownerPasswordData.santi);
   insertOwner(db, 'leandro', 'Leandro', ownerPasswordData.leandro);
   dbs.push(db);
@@ -486,8 +522,9 @@ async function createSaleThroughApi(d1, cookie, amountArs, idempotencyKey) {
       method: 'POST',
       cookie,
       body: {
-        grams: '1',
-        quantityUnit: 'GR',
+        type: 'venta',
+        quantity: '1',
+        quantityUnit: 'NORM',
         amountArs,
         idempotencyKey
       }

@@ -1,5 +1,5 @@
 export const MAX_INTEGER_DIGITS = 12;
-export const QUANTITY_UNITS = Object.freeze(['GR', 'AP']);
+export const QUANTITY_UNITS = Object.freeze(['NORM', 'GEN']);
 
 const POSITIVE_INTEGER_PATTERN = /^[1-9][0-9]*$/;
 
@@ -50,7 +50,7 @@ export function validateQuantityUnit(rawValue) {
   if (!QUANTITY_UNITS.includes(rawValue)) {
     return {
       ok: false,
-      message: 'La unidad debe ser GR o AP.'
+      message: 'El tipo debe ser NORM o GEN.'
     };
   }
 
@@ -60,13 +60,13 @@ export function validateQuantityUnit(rawValue) {
   };
 }
 
-export function validateSaleFields(gramsRaw, quantityUnitRaw, amountRaw) {
-  const grams = parsePositiveIntegerText(gramsRaw, 'Cantidad');
-  if (!grams.ok) {
+export function validateSaleFields(quantityRaw, quantityUnitRaw, amountRaw) {
+  const quantity = parsePositiveIntegerText(quantityRaw, 'Cantidad');
+  if (!quantity.ok) {
     return {
       ok: false,
-      field: 'grams',
-      message: grams.message
+      field: 'quantity',
+      message: quantity.message
     };
   }
 
@@ -90,8 +90,24 @@ export function validateSaleFields(gramsRaw, quantityUnitRaw, amountRaw) {
 
   return {
     ok: true,
-    grams: grams.value,
+    quantity: quantity.value,
     quantityUnit: quantityUnit.value,
+    amountArs: amount.value
+  };
+}
+
+export function validateWithdrawalFields(amountRaw) {
+  const amount = parsePositiveIntegerText(amountRaw, 'Importe total');
+  if (!amount.ok) {
+    return {
+      ok: false,
+      field: 'amount',
+      message: amount.message
+    };
+  }
+
+  return {
+    ok: true,
     amountArs: amount.value
   };
 }

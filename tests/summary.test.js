@@ -5,7 +5,7 @@ import {
   getOwnerSummary,
   getSummary
 } from '../functions/_shared/summary.js';
-import { createMemoryRepo, saleRecord } from './helpers/memory-repo.js';
+import { createMemoryRepo, saleRecord, withdrawalRecord } from './helpers/memory-repo.js';
 
 describe('resumen financiero', () => {
   it('calcula el estado inicial esperado desde filas activas', async () => {
@@ -36,6 +36,25 @@ describe('resumen financiero', () => {
     expect(summary.missingArs).toBe(0);
     expect(summary.profitArs).toBe(25000);
     expect(summary.state).toBe('ganancia');
+  });
+
+  it('resta retiros de la ganancia sin revertir la inversión recuperada', () => {
+    expect(calculateRecoverySummary(188000, 0, 108000)).toEqual({
+      totalArs: 80000,
+      recoveryTotalArs: 188000,
+      investmentArs: 0,
+      state: 'ganancia',
+      investmentRecovered: true,
+      missingArs: 0,
+      profitArs: 80000
+    });
+
+    expect(calculateRecoverySummary(145000, 120000, 30000)).toMatchObject({
+      totalArs: 115000,
+      investmentRecovered: true,
+      missingArs: 0,
+      profitArs: -5000
+    });
   });
 });
 
@@ -73,7 +92,27 @@ describe('resumen por responsable', () => {
     });
   });
 
-  it('rechaza valores nulos, negativos o una suma fuera del rango seguro', async () => {
+  it('resta los retiros al usuario autenticado correspondiente', async () => {
+    const repo = createMemoryRepo({
+      records: [
+        saleRecord({ userId: 'santi', amountArs: 188000 }),
+        withdrawalRecord({ userId: 'santi', amountArs: 108000 }),
+        withdrawalRecord({
+          userId: 'leandro',
+          userDisplayName: 'Leandro',
+          amountArs: 5000
+        })
+      ]
+    });
+
+    await expect(getOwnerSummary(repo)).resolves.toEqual({
+      santiArs: 80000,
+      leandroArs: -5000,
+      totalArs: 75000
+    });
+  });
+
+  it('rechaza valores nulos o una suma fuera del rango seguro y admite saldos negativos', async () => {
     const invalidRepo = {
       async getActiveOwnerTotalsArs() {
         return { santiArs: null, leandroArs: 0 };
@@ -84,7 +123,8 @@ describe('resumen por responsable', () => {
       status: 500,
       code: 'invalid_summary_value'
     });
-    for (const values of [[-1, 0], [Number.MAX_SAFE_INTEGER, 1]]) {
+    expect(calculateOwnerSummary(-1, 0)).toEqual({ santiArs: -1, leandroArs: 0, totalArs: -1 });
+    for (const values of [[Number.MAX_SAFE_INTEGER, 1]]) {
       let error;
       try {
         calculateOwnerSummary(...values);

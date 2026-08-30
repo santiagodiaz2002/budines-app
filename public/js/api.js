@@ -54,15 +54,10 @@ export async function listRecords({ limit = 30, offset = 0 } = {}) {
   return apiRequest(`/api/records?${params}`);
 }
 
-export async function createRecord({ grams, quantityUnit, amountArs, idempotencyKey }) {
+export async function createRecord(record) {
   return apiRequest('/api/records', {
     method: 'POST',
-    body: {
-      grams,
-      quantityUnit,
-      amountArs,
-      idempotencyKey
-    }
+    body: record
   });
 }
 

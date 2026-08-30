@@ -12,21 +12,30 @@ export function createMemoryRepo({ investmentArs = 120000, records = defaultReco
 
     async getActiveTotalArs() {
       return store
-        .filter((record) => record.status === 'activo' && !record.deletedAt)
+        .filter((record) => record.type !== 'retiro' && record.status === 'activo' && !record.deletedAt)
+        .reduce((sum, record) => sum + record.amountArs, 0);
+    },
+
+    async getActiveWithdrawalTotalArs() {
+      return store
+        .filter((record) => record.type === 'retiro' && record.status === 'activo' && !record.deletedAt)
         .reduce((sum, record) => sum + record.amountArs, 0);
     },
 
     async getActiveOwnerTotalsArs() {
-      const activeSales = store.filter(
-        (record) => record.type === 'venta' && record.status === 'activo' && !record.deletedAt
+      const activeOperations = store.filter(
+        (record) =>
+          (record.type === 'venta' || record.type === 'retiro') &&
+          record.status === 'activo' &&
+          !record.deletedAt
       );
       return {
-        santiArs: activeSales
+        santiArs: activeOperations
           .filter((record) => record.userId === 'santi')
-          .reduce((sum, record) => sum + record.amountArs, 0),
-        leandroArs: activeSales
+          .reduce((sum, record) => sum + signedAmount(record), 0),
+        leandroArs: activeOperations
           .filter((record) => record.userId === 'leandro')
-          .reduce((sum, record) => sum + record.amountArs, 0)
+          .reduce((sum, record) => sum + signedAmount(record), 0)
       };
     },
 
@@ -57,6 +66,17 @@ export function createMemoryRepo({ investmentArs = 120000, records = defaultReco
       return withUser;
     },
 
+    async insertWithdrawal(record) {
+      assertWithdrawalRecord(record);
+      if (store.some((existing) => existing.idempotencyKey === record.idempotencyKey)) {
+        throw new Error('UNIQUE constraint failed: operations.idempotency_key');
+      }
+
+      const withUser = withRecordMetadata(record);
+      store.push(withUser);
+      return withUser;
+    },
+
     async markRecordDeleted(recordId, userId, deletedAt) {
       const record = store.find((entry) => entry.id === recordId);
       if (!record) {
@@ -67,7 +87,7 @@ export function createMemoryRepo({ investmentArs = 120000, records = defaultReco
         return record;
       }
 
-      if (record.type === 'venta') {
+      if (record.type === 'venta' || record.type === 'retiro') {
         record.status = 'anulado';
         record.voidedAt = deletedAt;
         record.voidedByUserId = userId;
@@ -97,7 +117,7 @@ export function defaultRecords() {
       type: 'saldo_inicial',
       userId: null,
       userDisplayName: null,
-      grams: null,
+      quantity: null,
       quantityUnit: 'GR',
       amountArs: 3000,
       status: 'activo',
@@ -119,7 +139,7 @@ export function defaultRecords() {
       type: 'saldo_inicial',
       userId: null,
       userDisplayName: null,
-      grams: null,
+      quantity: null,
       quantityUnit: 'GR',
       amountArs: 62000,
       status: 'activo',
@@ -145,8 +165,34 @@ export function saleRecord(overrides = {}) {
     type: 'venta',
     userId: 'santi',
     userDisplayName: 'Santi',
-    grams: 10,
-    quantityUnit: 'GR',
+    quantity: 10,
+    quantityUnit: 'NORM',
+    amountArs: 1000,
+    status: 'activo',
+    commercialDate: '2026-07-12',
+    createdAt: '2026-07-12T15:00:00.000Z',
+    voidedAt: null,
+    voidedByUserId: null,
+    voidedByDisplayName: null,
+    idempotencyKey: `idem-${crypto.randomUUID()}`,
+    source: 'web',
+    deletedAt: null,
+    deletedByUserId: null,
+    deletedByDisplayName: null,
+    deletionReason: null,
+    isDeleted: false,
+    ...overrides
+  };
+}
+
+export function withdrawalRecord(overrides = {}) {
+  return {
+    id: crypto.randomUUID(),
+    type: 'retiro',
+    userId: 'santi',
+    userDisplayName: 'Santi',
+    quantity: null,
+    quantityUnit: null,
     amountArs: 1000,
     status: 'activo',
     commercialDate: '2026-07-12',
@@ -174,11 +220,36 @@ function assertSaleRecord(record) {
     throw new ApiError(400, 'missing_user', 'La venta debe tener usuario.');
   }
 
-  if (!Number.isSafeInteger(record.grams) || record.grams < 1) {
-    throw new ApiError(400, 'missing_grams', 'La venta debe tener gramos.');
+  if (!Number.isSafeInteger(record.quantity) || record.quantity < 1) {
+    throw new ApiError(400, 'missing_quantity', 'La venta debe tener cantidad.');
   }
 
-  if (record.quantityUnit !== 'GR' && record.quantityUnit !== 'AP') {
-    throw new ApiError(400, 'invalid_quantity_unit', 'La unidad debe ser GR o AP.');
+  if (record.quantityUnit !== 'NORM' && record.quantityUnit !== 'GEN') {
+    throw new ApiError(400, 'invalid_quantity_unit', 'El tipo debe ser NORM o GEN.');
   }
+}
+
+function assertWithdrawalRecord(record) {
+  if (record.type !== 'retiro' || record.quantity !== null || record.quantityUnit !== null) {
+    throw new ApiError(400, 'invalid_record_type', 'El retiro no debe tener cantidad ni tipo de venta.');
+  }
+  if (!record.userId) {
+    throw new ApiError(400, 'missing_user', 'El retiro debe tener usuario.');
+  }
+}
+
+function withRecordMetadata(record) {
+  return {
+    ...record,
+    userDisplayName: record.userId === 'santi' ? 'Santi' : 'Leandro',
+    voidedByDisplayName: null,
+    deletedAt: null,
+    deletedByUserId: null,
+    deletedByDisplayName: null,
+    isDeleted: false
+  };
+}
+
+function signedAmount(record) {
+  return record.type === 'retiro' ? -record.amountArs : record.amountArs;
 }

@@ -31,14 +31,14 @@ describe('validación de enteros positivos', () => {
 });
 
 describe('validacion de unidad de cantidad', () => {
-  it('acepta solamente GR y AP', () => {
-    expect(parseServerQuantityUnit('GR')).toBe('GR');
-    expect(parseServerQuantityUnit('AP')).toBe('AP');
-    expect(validateClientQuantityUnit('GR')).toEqual({ ok: true, value: 'GR' });
-    expect(validateClientQuantityUnit('AP')).toEqual({ ok: true, value: 'AP' });
+  it('acepta solamente NORM y GEN para ventas nuevas', () => {
+    expect(parseServerQuantityUnit('NORM')).toBe('NORM');
+    expect(parseServerQuantityUnit('GEN')).toBe('GEN');
+    expect(validateClientQuantityUnit('NORM')).toEqual({ ok: true, value: 'NORM' });
+    expect(validateClientQuantityUnit('GEN')).toEqual({ ok: true, value: 'GEN' });
   });
 
-  it.each(['', 'gr', 'ap', 'KG', 'tiros', null, 1])('rechaza %s', (value) => {
+  it.each(['', 'GR', 'AP', 'norm', 'gen', 'KG', null, 1])('rechaza %s', (value) => {
     expect(() => parseServerQuantityUnit(value)).toThrow();
     expect(validateClientQuantityUnit(value).ok).toBe(false);
   });

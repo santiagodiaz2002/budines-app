@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { createSale, deleteRecord } from '../functions/_shared/records-service.js';
+import { createSale, createWithdrawal, deleteRecord } from '../functions/_shared/records-service.js';
 import { getSummary } from '../functions/_shared/summary.js';
 import { createMemoryRepo, saleRecord } from './helpers/memory-repo.js';
 
@@ -25,14 +25,15 @@ describe('registros, idempotencia y eliminacion logica', () => {
 
     expect(summary.totalArs).toBe(4000);
     expect(listed.map((record) => record.id)).toEqual(['saldo-inicial-ars-3000', 'venta-activa']);
-    expect(repo.records.find((record) => record.id === 'saldo-inicial-ars-3000').grams).toBeNull();
+    expect(repo.records.find((record) => record.id === 'saldo-inicial-ars-3000').quantity).toBeNull();
     expect(repo.records.find((record) => record.id === 'saldo-inicial-ars-3000').quantityUnit).toBe('GR');
   });
 
   it('primera peticion inserta, repeticion no duplica y nueva clave crea otra venta', async () => {
     const repo = createMemoryRepo();
     const input = {
-      grams: '25',
+      quantity: '25',
+      quantityUnit: 'NORM',
       amountArs: '3000',
       idempotencyKey: 'idem-key-0000001'
     };
@@ -52,29 +53,29 @@ describe('registros, idempotencia y eliminacion logica', () => {
     expect(first.kind).toBe('created');
     expect(repeated.kind).toBe('existing');
     expect(second.kind).toBe('created');
-    expect(first.record.quantityUnit).toBe('GR');
+    expect(first.record.quantityUnit).toBe('NORM');
     expect(repo.records.filter((record) => record.type === 'venta')).toHaveLength(2);
   });
 
-  it('guarda unidad AP y GR sin cambiar totales economicos', async () => {
+  it('guarda tipos NORM y GEN sin cambiar totales economicos', async () => {
     const repo = createMemoryRepo();
 
-    const gr = await createSale(repo, {
-      grams: '350',
-      quantityUnit: 'GR',
+    const norm = await createSale(repo, {
+      quantity: '350',
+      quantityUnit: 'NORM',
       amountArs: '7000',
       idempotencyKey: 'idem-key-unit-gr'
     }, user);
-    const ap = await createSale(repo, {
-      grams: '12',
-      quantityUnit: 'AP',
+    const gen = await createSale(repo, {
+      quantity: '12',
+      quantityUnit: 'GEN',
       amountArs: '5000',
       idempotencyKey: 'idem-key-unit-ap'
     }, user);
     const summary = await getSummary(repo);
 
-    expect(gr.record).toMatchObject({ grams: 350, quantityUnit: 'GR', amountArs: 7000 });
-    expect(ap.record).toMatchObject({ grams: 12, quantityUnit: 'AP', amountArs: 5000 });
+    expect(norm.record).toMatchObject({ quantity: 350, quantityUnit: 'NORM', amountArs: 7000 });
+    expect(gen.record).toMatchObject({ quantity: 12, quantityUnit: 'GEN', amountArs: 5000 });
     expect(summary.totalArs).toBe(15000);
     expect(summary.missingArs).toBe(105000);
   });
@@ -82,7 +83,8 @@ describe('registros, idempotencia y eliminacion logica', () => {
   it('la misma clave con otra operacion produce conflicto', async () => {
     const repo = createMemoryRepo();
     const input = {
-      grams: '25',
+      quantity: '25',
+      quantityUnit: 'NORM',
       amountArs: '3000',
       idempotencyKey: 'idem-key-0000003'
     };
@@ -92,7 +94,7 @@ describe('registros, idempotencia y eliminacion logica', () => {
     await expect(
       createSale(repo, {
         ...input,
-        quantityUnit: 'AP',
+        quantityUnit: 'GEN',
         amountArs: '62000'
       }, user)
     ).rejects.toMatchObject({
@@ -101,12 +103,13 @@ describe('registros, idempotencia y eliminacion logica', () => {
     });
   });
 
-  it('rechaza venta normal con gramos nulos o usuario ausente', async () => {
+  it('rechaza venta nueva con cantidad nula, tipo histórico o usuario ausente', async () => {
     const repo = createMemoryRepo();
 
     await expect(
       createSale(repo, {
-        grams: '',
+        quantity: '',
+        quantityUnit: 'NORM',
         amountArs: '3000',
         idempotencyKey: 'idem-key-0000004'
       }, user)
@@ -116,8 +119,8 @@ describe('registros, idempotencia y eliminacion logica', () => {
 
     await expect(
       createSale(repo, {
-        grams: '25',
-        quantityUnit: 'KG',
+        quantity: '25',
+        quantityUnit: 'GR',
         amountArs: '3000',
         idempotencyKey: 'idem-key-0000007'
       }, user)
@@ -127,7 +130,8 @@ describe('registros, idempotencia y eliminacion logica', () => {
 
     await expect(
       createSale(repo, {
-        grams: '25',
+        quantity: '25',
+        quantityUnit: 'NORM',
         amountArs: '3000',
         idempotencyKey: 'idem-key-0000005'
       }, { id: null, displayName: 'Sin usuario' })
@@ -136,10 +140,80 @@ describe('registros, idempotencia y eliminacion logica', () => {
     });
   });
 
+  it('registra retiro autenticado, lo resta de Ganancia real y no agrega cantidad', async () => {
+    const repo = createMemoryRepo({
+      investmentArs: 0,
+      records: [saleRecord({ id: 'venta-base', amountArs: 188000 })]
+    });
+
+    const created = await createWithdrawal(
+      repo,
+      { amountArs: '108000', idempotencyKey: 'idem-retiro-108000' },
+      user,
+      new Date('2026-08-30T15:00:00.000Z')
+    );
+    const repeated = await createWithdrawal(
+      repo,
+      { amountArs: '108000', idempotencyKey: 'idem-retiro-108000' },
+      user,
+      new Date('2026-08-30T15:01:00.000Z')
+    );
+    const summary = await getSummary(repo);
+    const listed = await repo.listRecords(20, 0);
+
+    expect(created.kind).toBe('created');
+    expect(repeated.kind).toBe('existing');
+    expect(created.record).toMatchObject({
+      type: 'retiro',
+      userId: 'santi',
+      quantity: null,
+      quantityUnit: null,
+      amountArs: 108000,
+      commercialDate: '2026-08-30'
+    });
+    expect(summary).toMatchObject({
+      totalArs: 80000,
+      investmentArs: 0,
+      investmentRecovered: true,
+      profitArs: 80000
+    });
+    expect(listed.some((record) => record.type === 'retiro')).toBe(true);
+  });
+
+  it.each(['', '0', '-1', '1.5', 'texto'])('rechaza importe de retiro inválido %s', async (amountArs) => {
+    const repo = createMemoryRepo();
+    await expect(
+      createWithdrawal(repo, { amountArs, idempotencyKey: 'idem-retiro-invalido' }, user)
+    ).rejects.toMatchObject({ status: 400 });
+  });
+
+  it('dar de baja un retiro restaura el total sin borrar la fila', async () => {
+    const repo = createMemoryRepo({
+      investmentArs: 0,
+      records: [saleRecord({ amountArs: 188000 })]
+    });
+    const created = await createWithdrawal(
+      repo,
+      { amountArs: '108000', idempotencyKey: 'idem-retiro-baja-1' },
+      user
+    );
+
+    await deleteRecord(repo, created.record.id, user, 'ELIMINAR');
+    const summary = await getSummary(repo);
+
+    expect(summary.profitArs).toBe(188000);
+    expect(repo.records.find((record) => record.id === created.record.id)).toMatchObject({
+      type: 'retiro',
+      status: 'anulado',
+      isDeleted: true
+    });
+  });
+
   it('usuario autenticado elimina venta activa y la fila sigue existiendo', async () => {
     const repo = createMemoryRepo();
     const created = await createSale(repo, {
-      grams: '10',
+      quantity: '10',
+      quantityUnit: 'NORM',
       amountArs: '5000',
       idempotencyKey: 'idem-key-0000006'
     }, user);

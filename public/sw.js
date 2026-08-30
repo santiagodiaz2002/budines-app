@@ -1,11 +1,11 @@
-const CACHE_NAME = 'budines-shell-v34-joint-access';
+const CACHE_NAME = 'budines-shell-v35-operations';
 const SHELL_ASSETS = [
   '/',
   '/index.html',
-  '/styles.css?v=owner-summary-20260731',
+  '/styles.css?v=operations-20260830',
   '/js/audio-coordinator.js',
-  '/js/api.js?v=owner-summary-20260731',
-  '/js/app.js?v=joint-access-20260805',
+  '/js/api.js?v=operations-20260830',
+  '/js/app.js?v=operations-20260830',
   '/js/format.js',
   '/js/local-storage.js?v=auth-20260723',
   '/js/metronome-core.js',
@@ -16,7 +16,7 @@ const SHELL_ASSETS = [
   '/js/truco.js?v=joint-access-20260805',
   '/js/tuner-core.js',
   '/js/tuner.js?v=redesign13-20260730',
-  '/js/validation.js?v=quantity-20260723',
+  '/js/validation.js?v=operations-20260830',
   '/manifest.webmanifest',
   '/branding/logo-luz-en-ruinas.png',
   '/media/joint-clean.png',

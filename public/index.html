@@ -15,7 +15,7 @@
     <link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
     <link rel="icon" href="/icons/favicon-16.png" sizes="16x16" type="image/png">
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
-    <link rel="stylesheet" href="/styles.css?v=owner-summary-20260731">
+    <link rel="stylesheet" href="/styles.css?v=operations-20260830">
   </head>
   <body data-auth-state="booting">
     <a class="skip-link" href="#main-content">Saltar al contenido</a>
@@ -148,6 +148,10 @@
                 <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
                 <span>Carga</span>
               </button>
+              <button id="show-withdrawal" class="switch-button" type="button" role="tab" aria-selected="false" aria-controls="withdrawal-section" tabindex="-1">
+                <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M12 19l7-7-7-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span>Retirar</span>
+              </button>
               <button id="show-records" class="switch-button" type="button" role="tab" aria-selected="false" aria-controls="records-section" tabindex="-1">
                 <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10M7 12h10M7 17h7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
                 <span>Registros</span>
@@ -161,7 +165,7 @@
                   <h2>Registrar venta</h2>
                   <p class="heading-copy">Cargá cantidad e importe. El usuario se toma de tu sesión.</p>
                 </div>
-                <span class="status-pill status-pill--neutral">GR / AP</span>
+                <span class="status-pill status-pill--neutral">NORM / GEN</span>
               </div>
 
               <form id="sale-form" class="stack" novalidate>
@@ -169,8 +173,8 @@
                   <span id="quantity-label">Cantidad</span>
                   <div class="quantity-control">
                     <input
-                      id="grams-input"
-                      name="grams"
+                      id="quantity-input"
+                      name="quantity"
                       type="text"
                       inputmode="numeric"
                       pattern="[0-9]*"
@@ -181,22 +185,22 @@
                     >
                     <div class="quantity-unit-toggle" role="group" aria-label="Unidad de cantidad">
                       <button
-                        id="quantity-unit-gr"
+                        id="quantity-unit-norm"
                         class="quantity-unit-button is-active"
                         type="button"
-                        data-quantity-unit="GR"
+                        data-quantity-unit="NORM"
                         aria-pressed="true"
-                      >GR</button>
+                      >NORM</button>
                       <button
-                        id="quantity-unit-ap"
+                        id="quantity-unit-gen"
                         class="quantity-unit-button"
                         type="button"
-                        data-quantity-unit="AP"
+                        data-quantity-unit="GEN"
                         aria-pressed="false"
-                      >AP</button>
+                      >GEN</button>
                     </div>
                   </div>
-                  <small class="field-help">Elegí gramos o AP antes de guardar.</small>
+                  <small class="field-help">Elegí NORM o GEN antes de guardar.</small>
                 </div>
 
                 <label class="field">
@@ -219,6 +223,39 @@
                 <p id="amount-preview" class="input-preview" aria-live="polite"></p>
                 <p id="sale-error" class="form-message" role="status"></p>
                 <button id="sale-submit" class="primary-button" type="submit">Guardar venta</button>
+              </form>
+            </section>
+
+            <section id="withdrawal-section" class="panel" role="tabpanel" aria-labelledby="show-withdrawal" hidden>
+              <div class="panel-heading row-heading">
+                <div>
+                  <p class="eyebrow">Salida de dinero</p>
+                  <h2>Registrar retiro</h2>
+                  <p class="heading-copy">El retiro se asocia al usuario de tu sesión.</p>
+                </div>
+              </div>
+
+              <form id="withdrawal-form" class="stack" novalidate>
+                <label class="field" for="withdrawal-amount-input">
+                  <span>Importe total ARS</span>
+                  <span class="input-shell input-shell--currency">
+                    <span class="input-prefix" aria-hidden="true">$</span>
+                    <input
+                      id="withdrawal-amount-input"
+                      name="amountArs"
+                      type="text"
+                      inputmode="numeric"
+                      pattern="[0-9]*"
+                      maxlength="12"
+                      autocomplete="off"
+                      required
+                    >
+                  </span>
+                  <small id="withdrawal-amount-preview" class="field-help" aria-live="polite"></small>
+                </label>
+
+                <p id="withdrawal-error" class="form-message" role="status"></p>
+                <button id="withdrawal-submit" class="primary-button" type="submit">Registrar retiro</button>
               </form>
             </section>
 
@@ -647,6 +684,6 @@
     </div>
 
     <p id="live-region" class="sr-only" aria-live="polite" aria-atomic="true"></p>
-    <script type="module" src="/js/app.js?v=joint-access-20260805"></script>
+    <script type="module" src="/js/app.js?v=operations-20260830"></script>
   </body>
 </html>
