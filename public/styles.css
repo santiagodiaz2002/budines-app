@@ -966,6 +966,7 @@ body[data-auth-state="booting"] .shell {
 }
 
 .view-switcher {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   margin: 0 0 var(--space-3);
 }
 
@@ -2363,6 +2364,7 @@ body:has(.dialog-backdrop:not([hidden])) {
   }
 
   #budines-tool #entry-section,
+  #budines-tool #withdrawal-section,
   #budines-tool #records-section {
     grid-column: 2;
   }
@@ -2497,6 +2499,11 @@ body:has(.dialog-backdrop:not([hidden])) {
 
   .quantity-unit-toggle {
     min-width: 108px;
+  }
+
+  .view-switcher .switch-button {
+    gap: 5px;
+    padding: 0 8px;
   }
 
   .truco-header {

@@ -8,7 +8,7 @@ import {
   login,
   logout,
   registerAccount
-} from './api.js?v=owner-summary-20260731';
+} from './api.js?v=operations-20260830';
 import {
   formatArs,
   formatCommercialDate,
@@ -22,7 +22,11 @@ import { initToolNavigation } from './navigation.js?v=redesign13-20260730';
 import { initTruco } from './truco.js?v=joint-access-20260805';
 import { initTuner } from './tuner.js?v=redesign13-20260730';
 import { clearLocalStorageUser, setLocalStorageUser } from './local-storage.js?v=auth-20260723';
-import { parsePositiveIntegerText, validateSaleFields } from './validation.js?v=quantity-20260723';
+import {
+  parsePositiveIntegerText,
+  validateSaleFields,
+  validateWithdrawalFields
+} from './validation.js?v=operations-20260830';
 
 const AUTH_MODES = Object.freeze({
   login: {
@@ -66,16 +70,23 @@ const dom = {
   summaryLines: document.querySelector('#summary-lines'),
   ownerSummaryButton: document.querySelector('#owner-summary-button'),
   showEntry: document.querySelector('#show-entry'),
+  showWithdrawal: document.querySelector('#show-withdrawal'),
   showRecords: document.querySelector('#show-records'),
   entrySection: document.querySelector('#entry-section'),
+  withdrawalSection: document.querySelector('#withdrawal-section'),
   recordsSection: document.querySelector('#records-section'),
   saleForm: document.querySelector('#sale-form'),
-  gramsInput: document.querySelector('#grams-input'),
+  quantityInput: document.querySelector('#quantity-input'),
   quantityUnitButtons: [...document.querySelectorAll('[data-quantity-unit]')],
   amountInput: document.querySelector('#amount-input'),
   amountPreview: document.querySelector('#amount-preview'),
   saleSubmit: document.querySelector('#sale-submit'),
   saleError: document.querySelector('#sale-error'),
+  withdrawalForm: document.querySelector('#withdrawal-form'),
+  withdrawalAmountInput: document.querySelector('#withdrawal-amount-input'),
+  withdrawalAmountPreview: document.querySelector('#withdrawal-amount-preview'),
+  withdrawalSubmit: document.querySelector('#withdrawal-submit'),
+  withdrawalError: document.querySelector('#withdrawal-error'),
   reloadRecords: document.querySelector('#reload-records'),
   recordsState: document.querySelector('#records-state'),
   recordsList: document.querySelector('#records-list'),
@@ -105,7 +116,10 @@ const state = {
   isSubmittingSale: false,
   saleIdempotencyKey: null,
   lastSalePayload: null,
-  quantityUnit: 'GR',
+  quantityUnit: 'NORM',
+  isSubmittingWithdrawal: false,
+  withdrawalIdempotencyKey: null,
+  lastWithdrawalPayload: null,
   recordsOffset: 0,
   recordsLimit: 30,
   hasMoreRecords: false,
@@ -146,15 +160,20 @@ function bindEvents() {
   }
   dom.authPasswordToggle.addEventListener('click', togglePasswordVisibility);
   dom.saleForm.addEventListener('submit', handleSaleSubmit);
+  dom.withdrawalForm.addEventListener('submit', handleWithdrawalSubmit);
   dom.amountInput.addEventListener('input', handleAmountInput);
-  dom.gramsInput.addEventListener('input', handleSaleInputChange);
+  dom.quantityInput.addEventListener('input', handleSaleInputChange);
   for (const button of dom.quantityUnitButtons) {
     button.addEventListener('click', () => setQuantityUnit(button.dataset.quantityUnit));
   }
   dom.amountInput.addEventListener('input', handleSaleInputChange);
+  dom.withdrawalAmountInput.addEventListener('input', handleWithdrawalAmountInput);
+  dom.withdrawalAmountInput.addEventListener('input', handleWithdrawalInputChange);
   dom.showEntry.addEventListener('click', () => switchView('entry'));
+  dom.showWithdrawal.addEventListener('click', () => switchView('withdrawal'));
   dom.showRecords.addEventListener('click', () => switchView('records'));
   dom.showEntry.addEventListener('keydown', handleBudinesTabKeydown);
+  dom.showWithdrawal.addEventListener('keydown', handleBudinesTabKeydown);
   dom.showRecords.addEventListener('keydown', handleBudinesTabKeydown);
   dom.reloadRecords.addEventListener('click', () => loadRecords({ reset: true }));
   dom.loadMoreRecords.addEventListener('click', () => loadRecords({ reset: false }));
@@ -220,16 +239,17 @@ async function handleSaleSubmit(event) {
     return;
   }
 
-  const gramsRaw = dom.gramsInput.value;
+  const quantityRaw = dom.quantityInput.value;
   const amountRaw = dom.amountInput.value;
-  const validation = validateSaleFields(gramsRaw, state.quantityUnit, amountRaw);
+  const validation = validateSaleFields(quantityRaw, state.quantityUnit, amountRaw);
   if (!validation.ok) {
     showSaleError(validation.message, validation.field);
     return;
   }
 
   const payload = {
-    grams: gramsRaw,
+    type: 'venta',
+    quantity: quantityRaw,
     quantityUnit: state.quantityUnit,
     amountArs: amountRaw
   };
@@ -246,9 +266,9 @@ async function handleSaleSubmit(event) {
       idempotencyKey: state.saleIdempotencyKey
     });
 
-    dom.gramsInput.value = '';
+    dom.quantityInput.value = '';
     dom.amountInput.value = '';
-    setQuantityUnit('GR');
+    setQuantityUnit('NORM');
     dom.amountPreview.textContent = '';
     state.saleIdempotencyKey = null;
     state.lastSalePayload = null;
@@ -257,7 +277,7 @@ async function handleSaleSubmit(event) {
     await refreshAppData();
     const message = result.result === 'existing' ? 'Registro ya guardado.' : 'Registro guardado.';
     announce(message);
-    dom.gramsInput.focus();
+    dom.quantityInput.focus();
   } catch (error) {
     dom.saleError.textContent = `${error.message} Los datos siguen en el formulario.`;
     announce(error.message);
@@ -266,9 +286,62 @@ async function handleSaleSubmit(event) {
   }
 }
 
+async function handleWithdrawalSubmit(event) {
+  event.preventDefault();
+  if (state.isSubmittingWithdrawal || !canAccessBudines()) {
+    return;
+  }
+
+  const amountRaw = dom.withdrawalAmountInput.value;
+  const validation = validateWithdrawalFields(amountRaw);
+  if (!validation.ok) {
+    showWithdrawalError(validation.message);
+    return;
+  }
+
+  const payload = {
+    type: 'retiro',
+    amountArs: amountRaw
+  };
+
+  state.withdrawalIdempotencyKey ||= crypto.randomUUID();
+  state.lastWithdrawalPayload = payload;
+  setWithdrawalBusy(true);
+  dom.withdrawalError.textContent = 'Registrando retiro...';
+  announce('Registrando retiro.');
+
+  try {
+    const result = await createRecord({
+      ...payload,
+      idempotencyKey: state.withdrawalIdempotencyKey
+    });
+
+    dom.withdrawalAmountInput.value = '';
+    dom.withdrawalAmountPreview.textContent = '';
+    state.withdrawalIdempotencyKey = null;
+    state.lastWithdrawalPayload = null;
+    dom.withdrawalError.textContent = '';
+
+    await refreshAppData();
+    const message = result.result === 'existing' ? 'Retiro ya registrado.' : 'Retiro registrado.';
+    announce(message);
+    dom.withdrawalAmountInput.focus();
+  } catch (error) {
+    dom.withdrawalError.textContent = `${error.message} El importe sigue en el formulario.`;
+    announce(error.message);
+  } finally {
+    setWithdrawalBusy(false);
+  }
+}
+
 function handleAmountInput() {
   const parsed = parsePositiveIntegerText(dom.amountInput.value, 'Importe total');
   dom.amountPreview.textContent = parsed.ok ? formatArs(parsed.value) : '';
+}
+
+function handleWithdrawalAmountInput() {
+  const parsed = parsePositiveIntegerText(dom.withdrawalAmountInput.value, 'Importe total');
+  dom.withdrawalAmountPreview.textContent = parsed.ok ? formatArs(parsed.value) : '';
 }
 
 function handleSaleInputChange() {
@@ -277,13 +350,24 @@ function handleSaleInputChange() {
   }
 
   const unchanged =
-    state.lastSalePayload.grams === dom.gramsInput.value &&
+    state.lastSalePayload.quantity === dom.quantityInput.value &&
     state.lastSalePayload.quantityUnit === state.quantityUnit &&
     state.lastSalePayload.amountArs === dom.amountInput.value;
 
   if (!unchanged) {
     state.saleIdempotencyKey = null;
     state.lastSalePayload = null;
+  }
+}
+
+function handleWithdrawalInputChange() {
+  if (!state.lastWithdrawalPayload || state.isSubmittingWithdrawal) {
+    return;
+  }
+
+  if (state.lastWithdrawalPayload.amountArs !== dom.withdrawalAmountInput.value) {
+    state.withdrawalIdempotencyKey = null;
+    state.lastWithdrawalPayload = null;
   }
 }
 
@@ -421,7 +505,7 @@ function renderOwnerSummary(summary) {
 }
 
 function validOwnerAmount(value) {
-  if (!Number.isSafeInteger(value) || value < 0) {
+  if (!Number.isSafeInteger(value)) {
     throw new Error('El resumen recibido no es válido.');
   }
   return value;
@@ -505,7 +589,7 @@ function setSummaryTotal(value) {
 
 function renderSummaryProgress(summary) {
   const investment = Number(summary?.investmentArs);
-  const total = Number(summary?.totalArs);
+  const total = Number(summary?.recoveryTotalArs ?? summary?.totalArs);
   const percentage =
     Number.isFinite(investment) && investment > 0 && Number.isFinite(total)
       ? Math.round(Math.max(0, Math.min(100, (total / investment) * 100)))
@@ -574,12 +658,19 @@ function createRecordCard(record) {
 
   const details = document.createElement('dl');
   details.className = 'record-details';
-  details.append(
-    detailItem('Tipo', formatRecordType(record.type)),
-    detailItem('Usuario', record.user?.displayName || 'Saldo inicial'),
-    detailItem('Cantidad', formatQuantity(record)),
-    detailItem('Fecha', formatCommercialDate(record.commercialDate))
-  );
+  if (record.type === 'retiro') {
+    details.append(
+      detailItem('Tipo', `Retiro de ${record.user?.displayName || 'usuario'}`),
+      detailItem('Fecha', formatCommercialDate(record.commercialDate))
+    );
+  } else {
+    details.append(
+      detailItem('Tipo', formatRecordType(record.type)),
+      detailItem('Usuario', record.user?.displayName || 'Saldo inicial'),
+      detailItem('Cantidad', formatQuantity(record)),
+      detailItem('Fecha', formatCommercialDate(record.commercialDate))
+    );
+  }
 
   card.append(head, details);
   return card;
@@ -599,14 +690,19 @@ function detailItem(label, value) {
 function openDeleteDialog(record) {
   state.recordPendingDelete = record;
   dom.voidCopy.textContent = `Vas a eliminar ${formatArs(record.amountArs)}. La fila queda guardada como baja lógica y deja de contar en el resumen.`;
-  dom.voidDetails.replaceChildren(
+  const details = [
     detailItem('Importe', formatArs(record.amountArs)),
     detailItem('Tipo', formatRecordType(record.type)),
     detailItem('Usuario', record.user?.displayName || 'Saldo inicial'),
-    detailItem('Cantidad', formatQuantity(record)),
+  ];
+  if (record.type !== 'retiro') {
+    details.push(detailItem('Cantidad', formatQuantity(record)));
+  }
+  details.push(
     detailItem('Fecha', formatCommercialDate(record.commercialDate)),
     detailItem('Estado', formatRecordStatus(record.status))
   );
+  dom.voidDetails.replaceChildren(...details);
   dom.voidConfirmation.value = '';
   dom.voidError.textContent = '';
   dom.voidDialog.hidden = false;
@@ -688,7 +784,7 @@ function handleDocumentKeydown(event) {
 }
 
 function handleBudinesTabKeydown(event) {
-  const tabs = [dom.showEntry, dom.showRecords];
+  const tabs = [dom.showEntry, dom.showWithdrawal, dom.showRecords];
   let nextIndex;
 
   if (event.key === 'ArrowLeft') {
@@ -705,7 +801,7 @@ function handleBudinesTabKeydown(event) {
 
   event.preventDefault();
   const target = tabs[nextIndex];
-  switchView(target === dom.showRecords ? 'records' : 'entry');
+  switchView(target === dom.showRecords ? 'records' : target === dom.showWithdrawal ? 'withdrawal' : 'entry');
   target.focus();
 }
 
@@ -714,20 +810,28 @@ function switchView(view) {
     return;
   }
 
+  const entry = view === 'entry';
+  const withdrawal = view === 'withdrawal';
   const records = view === 'records';
-  dom.entrySection.hidden = records;
+  dom.entrySection.hidden = !entry;
+  dom.withdrawalSection.hidden = !withdrawal;
   dom.recordsSection.hidden = !records;
-  dom.showEntry.classList.toggle('is-active', !records);
-  dom.showRecords.classList.toggle('is-active', records);
-  dom.showEntry.setAttribute('aria-selected', records ? 'false' : 'true');
-  dom.showRecords.setAttribute('aria-selected', records ? 'true' : 'false');
-  dom.showEntry.tabIndex = records ? -1 : 0;
-  dom.showRecords.tabIndex = records ? 0 : -1;
+  for (const [tab, active] of [
+    [dom.showEntry, entry],
+    [dom.showWithdrawal, withdrawal],
+    [dom.showRecords, records]
+  ]) {
+    tab.classList.toggle('is-active', active);
+    tab.setAttribute('aria-selected', active ? 'true' : 'false');
+    tab.tabIndex = active ? 0 : -1;
+  }
 
   if (records) {
     loadRecords({ reset: true });
+  } else if (withdrawal) {
+    dom.withdrawalAmountInput.focus();
   } else {
-    dom.gramsInput.focus();
+    dom.quantityInput.focus();
   }
 }
 
@@ -760,7 +864,7 @@ async function showApp(user) {
     state.tools.navigation?.selectTab('budines');
     switchView('entry');
     await refreshAppData();
-    dom.gramsInput.focus();
+    dom.quantityInput.focus();
   } else {
     clearBudinesData();
     state.tools.navigation?.selectTab('truco');
@@ -845,25 +949,37 @@ function clearBudinesData() {
   dom.loadMoreRecords.hidden = true;
   dom.saleError.textContent = '';
   dom.amountPreview.textContent = '';
-  dom.gramsInput.value = '';
+  dom.quantityInput.value = '';
   dom.amountInput.value = '';
-  setQuantityUnit('GR');
+  dom.withdrawalError.textContent = '';
+  dom.withdrawalAmountPreview.textContent = '';
+  dom.withdrawalAmountInput.value = '';
+  setQuantityUnit('NORM');
   state.saleIdempotencyKey = null;
   state.lastSalePayload = null;
+  state.withdrawalIdempotencyKey = null;
+  state.lastWithdrawalPayload = null;
   state.recordPendingDelete = null;
 }
 
 function showSaleError(message, field) {
   dom.saleError.textContent = message;
-  dom.gramsInput.setAttribute('aria-invalid', field === 'grams' ? 'true' : 'false');
+  dom.quantityInput.setAttribute('aria-invalid', field === 'quantity' ? 'true' : 'false');
   dom.amountInput.setAttribute('aria-invalid', field === 'amount' ? 'true' : 'false');
-  const target = field === 'amount' ? dom.amountInput : dom.gramsInput;
+  const target = field === 'amount' ? dom.amountInput : dom.quantityInput;
   target.focus();
   announce(message);
 }
 
+function showWithdrawalError(message) {
+  dom.withdrawalError.textContent = message;
+  dom.withdrawalAmountInput.setAttribute('aria-invalid', 'true');
+  dom.withdrawalAmountInput.focus();
+  announce(message);
+}
+
 function setQuantityUnit(unit) {
-  if (unit !== 'GR' && unit !== 'AP') {
+  if (unit !== 'NORM' && unit !== 'GEN') {
     return;
   }
 
@@ -915,15 +1031,25 @@ function setAuthBusy(isBusy) {
 function setSaleBusy(isBusy) {
   state.isSubmittingSale = isBusy;
   dom.saleSubmit.disabled = isBusy;
-  dom.gramsInput.disabled = isBusy;
+  dom.quantityInput.disabled = isBusy;
   dom.amountInput.disabled = isBusy;
   for (const button of dom.quantityUnitButtons) {
     button.disabled = isBusy;
   }
   dom.saleSubmit.textContent = isBusy ? 'Guardando...' : 'Guardar venta';
   if (!isBusy) {
-    dom.gramsInput.removeAttribute('aria-invalid');
+    dom.quantityInput.removeAttribute('aria-invalid');
     dom.amountInput.removeAttribute('aria-invalid');
+  }
+}
+
+function setWithdrawalBusy(isBusy) {
+  state.isSubmittingWithdrawal = isBusy;
+  dom.withdrawalSubmit.disabled = isBusy;
+  dom.withdrawalAmountInput.disabled = isBusy;
+  dom.withdrawalSubmit.textContent = isBusy ? 'Registrando...' : 'Registrar retiro';
+  if (!isBusy) {
+    dom.withdrawalAmountInput.removeAttribute('aria-invalid');
   }
 }
 
@@ -940,12 +1066,13 @@ function canAccessBudines() {
 }
 
 function formatQuantity(record) {
-  if (record.grams === null || record.grams === undefined) {
+  if (record.quantity === null || record.quantity === undefined) {
     return 'Sin informar';
   }
 
-  const unit = record.quantityUnit === 'AP' ? 'AP' : 'GR';
-  return `${formatInteger(record.grams)} ${unit}`;
+  const allowedUnits = new Set(['GR', 'AP', 'NORM', 'GEN']);
+  const unit = allowedUnits.has(record.quantityUnit) ? record.quantityUnit : 'GR';
+  return `${formatInteger(record.quantity)} ${unit}`;
 }
 
 function stopLocalAudio() {

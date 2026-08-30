@@ -11,7 +11,7 @@ import { ApiError } from './http.js';
 const POSITIVE_INTEGER_PATTERN = /^[1-9][0-9]*$/;
 const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9:_-]{16,120}$/;
 const USERNAME_PATTERN = /^[A-Za-z0-9._-]+$/;
-const QUANTITY_UNITS = new Set(['GR', 'AP']);
+const QUANTITY_UNITS = new Set(['NORM', 'GEN']);
 const encoder = new TextEncoder();
 
 export function parsePositiveIntegerText(rawValue, label) {
@@ -39,9 +39,9 @@ export function parsePositiveIntegerText(rawValue, label) {
   return value;
 }
 
-export function parseQuantityUnit(value = 'GR') {
+export function parseQuantityUnit(value = 'NORM') {
   if (typeof value !== 'string' || !QUANTITY_UNITS.has(value)) {
-    throw new ApiError(400, 'invalid_quantity_unit', 'La unidad debe ser GR o AP.');
+    throw new ApiError(400, 'invalid_quantity_unit', 'El tipo debe ser NORM o GEN.');
   }
 
   return value;
