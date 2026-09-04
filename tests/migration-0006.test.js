@@ -19,6 +19,7 @@ describe('migración 0006_start_profit_period', () => {
     db.exec(readFileSync('migrations/0002_remove_incorrect_62000_record.sql', 'utf8'));
     db.exec(readFileSync('migrations/0004_add_quantity_unit.sql', 'utf8'));
     db.exec(readFileSync('migrations/0007_add_operations.sql', 'utf8'));
+    db.exec(readFileSync('migrations/0008_add_accounting_scope.sql', 'utf8'));
     insertPreviousSale({
       id: 'venta-anterior-santi',
       userId: 'santi',

@@ -439,6 +439,7 @@ function createTestD1() {
   db.exec(readFileSync('migrations/0004_add_quantity_unit.sql', 'utf8'));
   db.exec(readFileSync('migrations/0005_track_password_kdf_version.sql', 'utf8'));
   db.exec(readFileSync('migrations/0007_add_operations.sql', 'utf8'));
+  db.exec(readFileSync('migrations/0008_add_accounting_scope.sql', 'utf8'));
   insertOwner(db, 'santi', 'Santi', ownerPasswordData.santi);
   insertOwner(db, 'leandro', 'Leandro', ownerPasswordData.leandro);
   dbs.push(db);

@@ -1,6 +1,32 @@
 import { ALLOWED_USERS } from './constants.js';
 import { ApiError } from './http.js';
 
+const CURRENT_ACCOUNTING_MOVEMENTS_SQL = `
+  SELECT
+    r.type,
+    r.user_id,
+    r.amount_ars,
+    r.amount_ars AS signed_amount_ars
+  FROM records r
+  LEFT JOIN record_deletions rd ON rd.record_id = r.id
+  LEFT JOIN accounting_exclusions ae
+    ON ae.storage = 'records' AND ae.movement_id = r.id
+  WHERE r.status = 'activo'
+    AND rd.record_id IS NULL
+    AND ae.movement_id IS NULL
+  UNION ALL
+  SELECT
+    o.type,
+    o.user_id,
+    o.amount_ars,
+    CASE WHEN o.type = 'retiro' THEN -o.amount_ars ELSE o.amount_ars END AS signed_amount_ars
+  FROM operations o
+  LEFT JOIN accounting_exclusions ae
+    ON ae.storage = 'operations' AND ae.movement_id = o.id
+  WHERE o.status = 'activo'
+    AND ae.movement_id IS NULL
+`;
+
 export function createD1Repository(db) {
   return {
     async getInitialInvestmentArs() {
@@ -14,26 +40,24 @@ export function createD1Repository(db) {
 
     async getActiveTotalArs() {
       const row = await db.prepare(`
+        WITH current_accounting_movements AS (
+          ${CURRENT_ACCOUNTING_MOVEMENTS_SQL}
+        )
         SELECT COALESCE(SUM(amount_ars), 0) AS total_ars
-        FROM (
-          SELECT r.amount_ars
-          FROM records r
-          LEFT JOIN record_deletions rd ON rd.record_id = r.id
-          WHERE r.status = 'activo' AND rd.record_id IS NULL
-          UNION ALL
-          SELECT o.amount_ars
-          FROM operations o
-          WHERE o.type = 'venta' AND o.status = 'activo'
-        ) active_income
+        FROM current_accounting_movements
+        WHERE type != 'retiro'
       `).first();
       return parseNonNegativeTotal(row?.total_ars, 'El total acumulado no es válido.');
     },
 
     async getActiveWithdrawalTotalArs() {
       const row = await db.prepare(`
+        WITH current_accounting_movements AS (
+          ${CURRENT_ACCOUNTING_MOVEMENTS_SQL}
+        )
         SELECT COALESCE(SUM(amount_ars), 0) AS total_ars
-        FROM operations
-        WHERE type = 'retiro' AND status = 'activo'
+        FROM current_accounting_movements
+        WHERE type = 'retiro'
       `).first();
       return parseNonNegativeTotal(row?.total_ars, 'El total de retiros no es válido.');
     },
@@ -42,25 +66,14 @@ export function createD1Repository(db) {
       const santiId = ALLOWED_USERS.santi.id;
       const leandroId = ALLOWED_USERS.leandro.id;
       const row = await db.prepare(`
+        WITH current_accounting_movements AS (
+          ${CURRENT_ACCOUNTING_MOVEMENTS_SQL}
+        )
         SELECT
           COALESCE(SUM(CASE WHEN user_id = ? THEN signed_amount_ars ELSE 0 END), 0) AS santi_ars,
           COALESCE(SUM(CASE WHEN user_id = ? THEN signed_amount_ars ELSE 0 END), 0) AS leandro_ars
-        FROM (
-          SELECT r.user_id, r.amount_ars AS signed_amount_ars
-          FROM records r
-          LEFT JOIN record_deletions rd ON rd.record_id = r.id
-          WHERE r.type = 'venta'
-            AND r.status = 'activo'
-            AND rd.record_id IS NULL
-            AND r.user_id IN (?, ?)
-          UNION ALL
-          SELECT
-            o.user_id,
-            CASE WHEN o.type = 'retiro' THEN -o.amount_ars ELSE o.amount_ars END AS signed_amount_ars
-          FROM operations o
-          WHERE o.status = 'activo' AND o.user_id IN (?, ?)
-        ) owner_operations
-      `).bind(santiId, leandroId, santiId, leandroId, santiId, leandroId).first();
+        FROM current_accounting_movements
+      `).bind(santiId, leandroId).first();
       return {
         santiArs: Number(row?.santi_ars),
         leandroArs: Number(row?.leandro_ars)

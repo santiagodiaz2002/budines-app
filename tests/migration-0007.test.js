@@ -22,6 +22,7 @@ describe('migración 0007_add_operations', () => {
     insertLegacyApSale();
     db.exec(readFileSync('migrations/0006_start_profit_period.sql', 'utf8'));
     db.exec(readFileSync('migrations/0007_add_operations.sql', 'utf8'));
+    db.exec(readFileSync('migrations/0008_add_accounting_scope.sql', 'utf8'));
 
     let repo = createD1Repository(wrapD1(db));
     const legacy = serializeRecord(await repo.findRecordById('venta-historica-ap'));
@@ -81,6 +82,7 @@ describe('migración 0007_add_operations', () => {
     db.exec(readFileSync('migrations/0001_initial.sql', 'utf8'));
     db.exec(readFileSync('migrations/0004_add_quantity_unit.sql', 'utf8'));
     db.exec(readFileSync('migrations/0007_add_operations.sql', 'utf8'));
+    db.exec(readFileSync('migrations/0008_add_accounting_scope.sql', 'utf8'));
 
     expect(() => insertRawOperation({ type: 'venta', quantity: 1, unit: 'GR' })).toThrow();
     expect(() => insertRawOperation({ type: 'retiro', quantity: 1, unit: 'NORM' })).toThrow();
