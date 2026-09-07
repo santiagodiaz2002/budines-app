@@ -12,6 +12,14 @@ export async function getSession() {
   return apiRequest('/api/session');
 }
 
+export function listChatMessages(after = 0) {
+  return apiRequest(`/api/chat?after=${encodeURIComponent(after)}`);
+}
+
+export function sendChatMessage(message) {
+  return apiRequest('/api/chat', { method: 'POST', body: message });
+}
+
 export async function login({ username, password }) {
   return apiRequest('/api/login', {
     method: 'POST',
@@ -85,9 +93,14 @@ async function apiRequest(path, { method = 'GET', body } = {}) {
   }
 
   let response;
+  const controller = new AbortController();
+  options.signal = controller.signal;
+  options.cache = 'no-store';
+  const timeout = setTimeout(() => controller.abort(), 8000);
   try {
     response = await fetch(path, options);
   } catch {
+    clearTimeout(timeout);
     throw new ApiClientError('No hay conexión o el servidor no respondió.');
   }
 
@@ -99,6 +112,8 @@ async function apiRequest(path, { method = 'GET', body } = {}) {
       status: response.status,
       code: 'invalid_response'
     });
+  } finally {
+    clearTimeout(timeout);
   }
 
   if (!response.ok || payload?.ok === false) {

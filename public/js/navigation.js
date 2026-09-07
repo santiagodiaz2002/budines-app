@@ -1,4 +1,4 @@
-export const TOOL_TABS = ['budines', 'truco', 'metronome', 'tuner'];
+export const TOOL_TABS = ['budines', 'chat', 'truco', 'metronome', 'tuner'];
 
 export function initToolNavigation({
   nav = document.querySelector('#bottom-tabs'),

@@ -11,15 +11,15 @@ afterEach(() => {
 });
 
 describe('navegacion inferior de herramientas', () => {
-  it('expone exactamente cuatro pestañas y Budines inicia activa', () => {
+  it('expone las cinco pestañas y Budines inicia activa', () => {
     setupDom();
 
     const nav = initToolNavigation();
     const tabs = [...document.querySelectorAll('[data-tool-tab]')];
 
-    expect(tabs).toHaveLength(4);
+    expect(tabs).toHaveLength(5);
     expect(tabs.map((tab) => tab.dataset.toolTab)).toEqual(TOOL_TABS);
-    expect(tabs.map((tab) => tab.textContent.trim())).toEqual(['Budines', 'Truco', 'Metrónomo', 'Afinador']);
+    expect(tabs.map((tab) => tab.textContent.trim())).toEqual(['Budines', 'Chat', 'Truco', 'Metrónomo', 'Afinador']);
     expect(nav.currentTab).toBe('budines');
     expect(document.body.dataset.activeTool).toBe('budines');
     expect(document.querySelector('#budines-tool').hidden).toBe(false);
@@ -74,6 +74,8 @@ describe('navegacion inferior de herramientas', () => {
   it('permite inicializar solo herramientas locales sin Budines', () => {
     setupDom();
     document.querySelector('#tab-budines').remove();
+    document.querySelector('#tab-chat').remove();
+    document.querySelector('#chat-tool').remove();
     document.querySelector('#budines-tool').remove();
 
     const nav = initToolNavigation({

@@ -1,18 +1,19 @@
-const CACHE_NAME = 'budines-shell-v35-operations';
+const CACHE_NAME = 'budines-shell-v36-offline-chat';
 const SHELL_ASSETS = [
   '/',
-  '/index.html',
-  '/styles.css?v=operations-20260830',
+  '/styles.css?v=offline-chat-20260907',
   '/js/audio-coordinator.js',
-  '/js/api.js?v=operations-20260830',
-  '/js/app.js?v=operations-20260830',
+  '/js/chat.js?v=offline-chat-20260907',
+  '/js/local-profile.js?v=offline-chat-20260907',
+  '/js/api.js?v=offline-chat-20260907',
+  '/js/app.js?v=offline-chat-20260907',
   '/js/format.js',
   '/js/local-storage.js?v=auth-20260723',
   '/js/metronome-core.js',
   '/js/metronome-core-v2.js?v=metronome-continuous-20260716',
   '/js/metronome-editor.js?v=redesign13-20260730',
   '/js/metronome.js',
-  '/js/navigation.js?v=redesign13-20260730',
+  '/js/navigation.js?v=offline-chat-20260907',
   '/js/truco.js?v=joint-access-20260805',
   '/js/tuner-core.js',
   '/js/tuner.js?v=redesign13-20260730',
@@ -42,7 +43,7 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))))
+      .then((keys) => Promise.all(keys.filter((key) => key.startsWith('budines-shell-') && key !== CACHE_NAME).map((key) => caches.delete(key))))
       .then(() => self.clients.claim())
   );
 });
@@ -60,19 +61,17 @@ self.addEventListener('fetch', (event) => {
   }
 
   if (event.request.mode === 'navigate') {
-    event.respondWith(
-      fetch(event.request)
-        .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put('/index.html', copy));
-          return response;
-        })
-        .catch(() => caches.match('/index.html'))
-    );
+    // Pages redirects /index.html to /. A redirected cached response is invalid
+    // for navigation requests with redirect=manual, so use the canonical root.
+    event.respondWith(caches.open(CACHE_NAME).then(async (cache) =>
+      (await cache.match('/')) || fetch(event.request)
+    ));
     return;
   }
 
-  event.respondWith(
-    caches.match(event.request).then((cached) => cached || fetch(event.request))
-  );
+  if (SHELL_ASSETS.includes(url.pathname + url.search)) {
+    event.respondWith(caches.open(CACHE_NAME).then(async (cache) =>
+      (await cache.match(event.request)) || fetch(event.request)
+    ));
+  }
 });

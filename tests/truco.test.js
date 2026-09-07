@@ -474,10 +474,10 @@ describe('Truco a 30', () => {
     const app = readFileSync('public/js/app.js', 'utf8');
     const serviceWorker = readFileSync('public/sw.js', 'utf8');
 
-    expect(html).toContain('/js/app.js?v=operations-20260830');
+    expect(html).toContain('/js/app.js?v=offline-chat-20260907');
     expect(app).toContain("./truco.js?v=joint-access-20260805");
-    expect(serviceWorker).toContain("budines-shell-v35-operations");
-    expect(serviceWorker).toContain('/js/app.js?v=operations-20260830');
+    expect(serviceWorker).toContain("budines-shell-v36-offline-chat");
+    expect(serviceWorker).toContain('/js/app.js?v=offline-chat-20260907');
     expect(serviceWorker).toContain('/js/truco.js?v=joint-access-20260805');
   });
 });

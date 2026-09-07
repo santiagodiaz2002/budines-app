@@ -15,7 +15,7 @@
     <link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
     <link rel="icon" href="/icons/favicon-16.png" sizes="16x16" type="image/png">
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
-    <link rel="stylesheet" href="/styles.css?v=operations-20260830">
+    <link rel="stylesheet" href="/styles.css?v=offline-chat-20260907">
   </head>
   <body data-auth-state="booting">
     <a class="skip-link" href="#main-content">Saltar al contenido</a>
@@ -45,6 +45,10 @@
       </header>
 
       <main id="main-content" tabindex="-1">
+        <aside id="connection-notice" class="panel" role="status" hidden>
+          Sin conexión al servidor. Truco, Metrónomo y Afinador están disponibles en este dispositivo.
+          <button id="connection-retry" type="button" class="quiet-button">Reintentar conexión</button>
+        </aside>
         <section id="auth-view" class="panel auth-panel" aria-labelledby="auth-title" hidden>
           <div class="auth-brand">
             <img class="brand-logo brand-logo--auth" src="/branding/logo-luz-en-ruinas.png" alt="Luz en Ruinas" width="1448" height="1086">
@@ -56,6 +60,7 @@
             <p class="heading-copy">Tu espacio cotidiano para registrar, jugar y hacer música.</p>
           </div>
 
+          <button id="local-tools-button" type="button" class="quiet-button">Usar herramientas locales sin iniciar sesión</button>
           <div class="auth-mode-switcher" role="group" aria-label="Acceso">
             <button id="auth-mode-login" class="switch-button is-active" type="button" data-auth-mode="login">Iniciar sesión</button>
             <button id="auth-mode-register" class="switch-button" type="button" data-auth-mode="register">Crear cuenta</button>
@@ -279,6 +284,17 @@
               <button id="load-more-records" class="secondary-button" type="button" hidden>Ver más</button>
             </section>
           </section>
+        </section>
+
+        <section id="chat-tool" class="tool-panel panel" data-tool-panel="chat" role="tabpanel" aria-labelledby="tab-chat" hidden>
+          <h2>Chat global</h2>
+          <p id="chat-status" role="status"></p>
+          <div id="chat-messages" class="chat-messages" aria-label="Historial global"></div>
+          <form id="chat-form" class="chat-compose">
+            <label for="chat-input">Mensaje</label>
+            <textarea id="chat-input" maxlength="2000" rows="2" required placeholder="Escribí un mensaje"></textarea>
+            <button id="chat-send" class="primary-button" type="submit">Enviar</button>
+          </form>
         </section>
 
         <section id="truco-tool" class="tool-panel" data-tool-panel="truco" role="tabpanel" aria-labelledby="tab-truco" hidden>
@@ -538,6 +554,9 @@
         <svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 10.5c0-2.2 1.8-4 4-4h6c2.2 0 4 1.8 4 4v6.8c0 .7-.6 1.2-1.2 1.2H6.2c-.7 0-1.2-.6-1.2-1.2zM8 6.5V5m4 1.5V4.5m4 2V5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span class="tab-label">Budines</span>
       </button>
+      <button id="tab-chat" class="bottom-tab" type="button" role="tab" aria-selected="false" aria-controls="chat-tool" data-tool-tab="chat" tabindex="-1">
+        <svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v12H9l-5 4Z" fill="none" stroke="currentColor" stroke-width="1.8"/></svg><span class="tab-label">Chat</span>
+      </button>
       <button id="tab-truco" class="bottom-tab" type="button" role="tab" aria-selected="false" aria-controls="truco-tool" data-tool-tab="truco">
         <svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m8.4 5.2 7.7-1.4 2.2 12.4-7.7 1.4zM5.6 7.1h7.8v12.6H5.6zM8 10.2h3M8 13h3M8 15.8h2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span class="tab-label">Truco</span>
@@ -684,6 +703,6 @@
     </div>
 
     <p id="live-region" class="sr-only" aria-live="polite" aria-atomic="true"></p>
-    <script type="module" src="/js/app.js?v=operations-20260830"></script>
+    <script type="module" src="/js/app.js?v=offline-chat-20260907"></script>
   </body>
 </html>

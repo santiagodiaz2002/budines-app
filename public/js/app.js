@@ -8,7 +8,7 @@ import {
   login,
   logout,
   registerAccount
-} from './api.js?v=operations-20260830';
+} from './api.js?v=offline-chat-20260907';
 import {
   formatArs,
   formatCommercialDate,
@@ -18,10 +18,12 @@ import {
 } from './format.js';
 import { createAudioCoordinator } from './audio-coordinator.js';
 import { initMetronome } from './metronome-editor.js?v=redesign13-20260730';
-import { initToolNavigation } from './navigation.js?v=redesign13-20260730';
+import { initToolNavigation } from './navigation.js?v=offline-chat-20260907';
 import { initTruco } from './truco.js?v=joint-access-20260805';
 import { initTuner } from './tuner.js?v=redesign13-20260730';
 import { clearLocalStorageUser, setLocalStorageUser } from './local-storage.js?v=auth-20260723';
+import { rememberLocalProfile, readLocalProfile, forgetLocalProfile } from './local-profile.js?v=offline-chat-20260907';
+import { initChat } from './chat.js?v=offline-chat-20260907';
 import {
   parsePositiveIntegerText,
   validateSaleFields,
@@ -43,8 +45,10 @@ const AUTH_MODES = Object.freeze({
   }
 });
 
-const OWNER_TABS = ['budines', 'truco', 'metronome', 'tuner'];
-const COMMON_TABS = ['truco', 'metronome', 'tuner'];
+const OWNER_TABS = ['budines', 'chat', 'truco', 'metronome', 'tuner'];
+const COMMON_TABS = ['chat', 'truco', 'metronome', 'tuner'];
+let chat = null;
+let localMode = false;
 
 const dom = {
   authView: document.querySelector('#auth-view'),
@@ -154,6 +158,9 @@ function init() {
 }
 
 function bindEvents() {
+  document.querySelector('#local-tools-button').addEventListener('click', () => showLocalApp());
+  document.querySelector('#connection-retry').addEventListener('click', () => window.location.reload());
+  window.addEventListener('online', () => { if (localMode) window.location.reload(); });
   dom.authForm.addEventListener('submit', handleAuthSubmit);
   for (const button of dom.authModeButtons) {
     button.addEventListener('click', () => setAuthMode(button.dataset.authMode));
@@ -193,14 +200,19 @@ async function bootSession() {
   setAuthBusy(true);
   document.body.dataset.authState = 'booting';
   try {
+    if (navigator.onLine === false) {
+      await showLocalApp();
+      return;
+    }
     const session = await getSession();
     if (session.authenticated) {
       await showApp(session.user);
     } else {
+      forgetLocalProfile();
       showAuth();
     }
   } catch (error) {
-    showAuth(error.message);
+    await showLocalApp();
   } finally {
     setAuthBusy(false);
   }
@@ -375,9 +387,21 @@ async function handleLogout() {
   dom.logoutButton.disabled = true;
   stopLocalAudio();
   try {
+    if (localMode) {
+      forgetLocalProfile();
+      window.location.reload();
+      return;
+    }
     await logout();
-  } finally {
+  } catch (error) {
+    announce(error.message);
+    dom.logoutButton.disabled = false;
+    return;
+  }
+  {
     state.user = null;
+    chat?.destroy();
+    forgetLocalProfile();
     clearLocalStorageUser();
     clearBudinesData();
     showAuth();
@@ -836,6 +860,7 @@ function switchView(view) {
 }
 
 function showAuth(message = '') {
+  chat?.destroy();
   document.body.dataset.authState = 'auth';
   dom.authView.hidden = false;
   hideToolPanels();
@@ -847,11 +872,22 @@ function showAuth(message = '') {
   dom.authUsername.focus();
 }
 
-async function showApp(user) {
+async function showLocalApp() {
+  localMode = true;
+  await showApp(readLocalProfile(), { offline: true });
+  document.querySelector('#connection-notice').hidden = false;
+}
+
+async function showApp(user, { offline = false } = {}) {
+  localMode = offline;
+  if (!offline) rememberLocalProfile(user);
+  document.querySelector('#connection-notice').hidden = !offline;
   state.user = user;
   setLocalStorageUser(user);
   setBudinesAccess(Boolean(user.capabilities?.canAccessBudines));
   initLocalTools(user);
+  chat?.destroy();
+  chat = initChat(document.querySelector('#chat-tool'), user, { offline });
   initNavigationForUser(user);
 
   document.body.dataset.authState = 'app';
@@ -867,8 +903,9 @@ async function showApp(user) {
     dom.quantityInput.focus();
   } else {
     clearBudinesData();
-    state.tools.navigation?.selectTab('truco');
+    state.tools.navigation?.selectTab(offline ? 'truco' : 'chat');
   }
+  chat.refresh();
 }
 
 function initLocalTools(user) {
@@ -903,7 +940,8 @@ function initNavigationForUser(user) {
   const allowedTabs = user.capabilities?.canAccessBudines ? OWNER_TABS : COMMON_TABS;
   state.tools.navigation = initToolNavigation({
     allowedTabs,
-    initialTab: allowedTabs[0]
+    initialTab: allowedTabs[0],
+    onChange: () => chat?.refresh()
   });
 }
 
@@ -1102,6 +1140,6 @@ function announce(message) {
 function registerServiceWorker() {
   const serviceWorker = globalThis.navigator?.serviceWorker || globalThis.window?.navigator?.serviceWorker;
   if (serviceWorker) {
-    serviceWorker.register('/sw.js').catch(() => {});
+    serviceWorker.register('/sw.js', { updateViaCache: 'none' }).then((registration) => registration.update()).catch(() => {});
   }
 }
