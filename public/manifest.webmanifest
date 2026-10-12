@@ -1,7 +1,7 @@
 {
   "name": "Budines",
   "short_name": "Budines",
-  "description": "Budines y herramientas compartidas de Luz en Ruinas.",
+  "description": "Chat y herramientas compartidas de Luz en Ruinas.",
   "lang": "es-AR",
   "start_url": "/",
   "scope": "/",
@@ -9,7 +9,10 @@
   "orientation": "any",
   "background_color": "#05070c",
   "theme_color": "#05070c",
-  "categories": ["music", "utilities"],
+  "categories": [
+    "music",
+    "utilities"
+  ],
   "icons": [
     {
       "src": "/icons/favicon-16.png",

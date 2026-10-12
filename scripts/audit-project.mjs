@@ -8,8 +8,8 @@ const requiredFiles = [
   '.dev.vars.example',
   'README.md',
   'AGENTS.md',
-  'migrations/0001_initial.sql',
-  'migrations/0003_password_auth.sql',
+  'database/schema.sql',
+  'migrations/0011_retire_accounting.sql',
   'public/index.html',
   'public/styles.css',
   'public/manifest.webmanifest',
@@ -22,6 +22,9 @@ const requiredFiles = [
   'functions/api/logout.js',
   'functions/api/records/index.js',
   'functions/api/summary.js',
+  'functions/api/owner-summary.js',
+  'functions/api/records/[id]/void.js',
+  'functions/api/chat.js',
   'functions/api/health.js',
   'scripts/seed-owners.mjs'
 ];
@@ -39,15 +42,17 @@ if (!gitignore.includes('.dev.vars')) {
   failures.push('.dev.vars no está ignorado');
 }
 
-const migration = readIfExists('migrations/0001_initial.sql');
-for (const forbidden of [' REAL ', '\nREAL ', ' REAL\n']) {
-  if (migration.includes(forbidden)) {
-    failures.push('la migración usa REAL');
-  }
+const schema = readIfExists('database/schema.sql');
+const allowedTables = new Set(['app_users', 'app_sessions', 'auth_rate_limits', 'chat_messages']);
+const bootstrapTables = [...schema.matchAll(/CREATE TABLE(?: IF NOT EXISTS)?\s+(\w+)/gi)]
+  .map((match) => match[1]);
+if (bootstrapTables.length !== allowedTables.size || bootstrapTables.some((table) => !allowedTables.has(table))) {
+  failures.push('el esquema inicial debe contener solo cuentas, sesiones, límites de autenticación y chat');
 }
-
-if (!migration.includes("amount_ars) = 'integer'") || !migration.includes('grams IS NULL')) {
-  failures.push('la migración no evidencia restricciones enteras/nulos esperadas');
+for (const retiredModule of ['d1-repository.js', 'records-service.js', 'summary.js']) {
+  if (existsSync(join('functions/_shared', retiredModule))) {
+    failures.push(`sigue presente el módulo comercial ${retiredModule}`);
+  }
 }
 
 const frontendFiles = collectFiles('public/js').filter((file) => file.endsWith('.js'));
@@ -68,9 +73,6 @@ for (const file of frontendFiles) {
   }
   if (content.includes('innerHTML')) {
     failures.push(`${file} usa innerHTML`);
-  }
-  if (content.includes('65000')) {
-    failures.push(`${file} contiene una suma inicial artificial`);
   }
 }
 

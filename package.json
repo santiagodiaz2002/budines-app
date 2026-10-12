@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "PWA privada para registrar operaciones compartidas de Budines.",
+  "description": "PWA con chat y herramientas locales de Luz en Ruinas.",
   "scripts": {
     "dev": "wrangler pages dev public --port 8788",
     "test": "vitest run",
@@ -16,7 +16,9 @@
     "seed:owners:local": "node scripts/seed-owners.mjs --local",
     "seed:owners:remote": "node scripts/seed-owners.mjs --remote",
     "icons": "node scripts/generate-icons.mjs",
-    "deploy": "wrangler pages deploy public --project-name budines"
+    "deploy": "wrangler pages deploy public --project-name budines",
+    "db:bootstrap:local": "wrangler d1 execute budines --local --file database/schema.sql",
+    "db:bootstrap:remote": "wrangler d1 execute budines --remote --file database/schema.sql"
   },
   "devDependencies": {
     "happy-dom": "^20.10.6",

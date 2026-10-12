@@ -45,3 +45,19 @@ it('navegación offline devuelve la raíz no redirigida y nunca guarda APIs', as
   handlers.fetch({ request: { url: 'https://budines.test/api/chat', method: 'GET' }, respondWith: result => { response = result; } });
   await expect(response).rejects.toThrow('offline');
 });
+
+it('actualizar el shell elimina versiones anteriores y conserva caches ajenos', async () => {
+  const { sandbox, handlers } = worker();
+  const deleted = [];
+  sandbox.caches = {
+    keys: async () => ['budines-shell-v36-offline-chat', 'budines-shell-v37-tools-only', 'otra-app'],
+    delete: async key => { deleted.push(key); return true; }
+  };
+  let claimed = false;
+  sandbox.self.clients = { claim: async () => { claimed = true; } };
+  let activation;
+  handlers.activate({ waitUntil: promise => { activation = promise; } });
+  await activation;
+  expect(deleted).toEqual(['budines-shell-v36-offline-chat']);
+  expect(claimed).toBe(true);
+});

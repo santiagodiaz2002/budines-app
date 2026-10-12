@@ -15,7 +15,7 @@
     <link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
     <link rel="icon" href="/icons/favicon-16.png" sizes="16x16" type="image/png">
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
-    <link rel="stylesheet" href="/styles.css?v=offline-chat-20260907">
+    <link rel="stylesheet" href="/styles.css?v=tools-only-20261012">
   </head>
   <body data-auth-state="booting">
     <a class="skip-link" href="#main-content">Saltar al contenido</a>
@@ -57,7 +57,7 @@
           <div class="panel-heading auth-heading">
             <p class="eyebrow">Budines · Herramientas compartidas</p>
             <h1 id="auth-title">Ingresá a la app</h1>
-            <p class="heading-copy">Tu espacio cotidiano para registrar, jugar y hacer música.</p>
+            <p class="heading-copy">Tu espacio cotidiano para conversar, jugar y hacer música.</p>
           </div>
 
           <button id="local-tools-button" type="button" class="quiet-button">Usar herramientas locales sin iniciar sesión</button>
@@ -112,178 +112,6 @@
             <button id="auth-submit" class="primary-button" type="submit">Iniciar sesión</button>
           </form>
           <p class="auth-footnote">Las herramientas musicales funcionan en este dispositivo.</p>
-        </section>
-
-        <section id="budines-tool" class="tool-panel" data-tool-panel="budines" role="tabpanel" aria-labelledby="tab-budines" hidden>
-          <section id="app-view">
-            <section id="summary-card" class="summary-card" aria-live="polite">
-              <div class="summary-head">
-                <div>
-                  <p class="eyebrow">Capital compartido</p>
-                  <p class="summary-label">Total acumulado</p>
-                </div>
-                <div class="summary-head-actions">
-                  <span class="summary-currency">ARS</span>
-                  <button id="owner-summary-button" class="quiet-button summary-owner-button" type="button" hidden>Resumen</button>
-                </div>
-              </div>
-              <p id="summary-total" class="summary-total">$ 0</p>
-              <div class="summary-progress-block">
-                <div class="summary-progress-copy">
-                  <span>Recuperación de la inversión</span>
-                  <strong id="summary-progress-label">0%</strong>
-                </div>
-                <div
-                  id="summary-progress"
-                  class="summary-progress"
-                  role="progressbar"
-                  aria-label="Recuperación de la inversión"
-                  aria-valuemin="0"
-                  aria-valuemax="100"
-                  aria-valuenow="0"
-                >
-                  <span id="summary-progress-fill"></span>
-                </div>
-              </div>
-              <div id="summary-lines" class="summary-lines"></div>
-            </section>
-
-            <nav class="view-switcher" aria-label="Secciones de Budines" aria-orientation="horizontal" role="tablist">
-              <button id="show-entry" class="switch-button is-active" type="button" role="tab" aria-selected="true" aria-controls="entry-section">
-                <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                <span>Carga</span>
-              </button>
-              <button id="show-withdrawal" class="switch-button" type="button" role="tab" aria-selected="false" aria-controls="withdrawal-section" tabindex="-1">
-                <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M12 19l7-7-7-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                <span>Retirar</span>
-              </button>
-              <button id="show-records" class="switch-button" type="button" role="tab" aria-selected="false" aria-controls="records-section" tabindex="-1">
-                <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10M7 12h10M7 17h7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                <span>Registros</span>
-              </button>
-            </nav>
-
-            <section id="entry-section" class="panel" role="tabpanel" aria-labelledby="show-entry">
-              <div class="panel-heading row-heading">
-                <div>
-                  <p class="eyebrow">Nueva operación</p>
-                  <h2>Registrar venta</h2>
-                  <p class="heading-copy">Cargá cantidad e importe. El usuario se toma de tu sesión.</p>
-                </div>
-                <span class="status-pill status-pill--neutral">NORM / GEN</span>
-              </div>
-
-              <form id="sale-form" class="stack" novalidate>
-                <div class="field quantity-field">
-                  <span id="quantity-label">Cantidad</span>
-                  <div class="quantity-control">
-                    <input
-                      id="quantity-input"
-                      name="quantity"
-                      type="text"
-                      inputmode="numeric"
-                      pattern="[0-9]*"
-                      maxlength="12"
-                      autocomplete="off"
-                      aria-labelledby="quantity-label"
-                      required
-                    >
-                    <div class="quantity-unit-toggle" role="group" aria-label="Unidad de cantidad">
-                      <button
-                        id="quantity-unit-norm"
-                        class="quantity-unit-button is-active"
-                        type="button"
-                        data-quantity-unit="NORM"
-                        aria-pressed="true"
-                      >NORM</button>
-                      <button
-                        id="quantity-unit-gen"
-                        class="quantity-unit-button"
-                        type="button"
-                        data-quantity-unit="GEN"
-                        aria-pressed="false"
-                      >GEN</button>
-                    </div>
-                  </div>
-                  <small class="field-help">Elegí NORM o GEN antes de guardar.</small>
-                </div>
-
-                <label class="field">
-                  <span>Importe total <small>ARS</small></span>
-                  <span class="input-shell input-shell--currency">
-                    <span class="input-prefix" aria-hidden="true">$</span>
-                    <input
-                      id="amount-input"
-                      name="amountArs"
-                      type="text"
-                      inputmode="numeric"
-                      pattern="[0-9]*"
-                      maxlength="12"
-                      autocomplete="off"
-                      required
-                    >
-                  </span>
-                </label>
-
-                <p id="amount-preview" class="input-preview" aria-live="polite"></p>
-                <p id="sale-error" class="form-message" role="status"></p>
-                <button id="sale-submit" class="primary-button" type="submit">Guardar venta</button>
-              </form>
-            </section>
-
-            <section id="withdrawal-section" class="panel" role="tabpanel" aria-labelledby="show-withdrawal" hidden>
-              <div class="panel-heading row-heading">
-                <div>
-                  <p class="eyebrow">Salida de dinero</p>
-                  <h2>Registrar retiro</h2>
-                  <p class="heading-copy">El retiro se asocia al usuario de tu sesión.</p>
-                </div>
-              </div>
-
-              <form id="withdrawal-form" class="stack" novalidate>
-                <label class="field" for="withdrawal-amount-input">
-                  <span>Importe total ARS</span>
-                  <span class="input-shell input-shell--currency">
-                    <span class="input-prefix" aria-hidden="true">$</span>
-                    <input
-                      id="withdrawal-amount-input"
-                      name="amountArs"
-                      type="text"
-                      inputmode="numeric"
-                      pattern="[0-9]*"
-                      maxlength="12"
-                      autocomplete="off"
-                      required
-                    >
-                  </span>
-                  <small id="withdrawal-amount-preview" class="field-help" aria-live="polite"></small>
-                </label>
-
-                <p id="withdrawal-error" class="form-message" role="status"></p>
-                <button id="withdrawal-submit" class="primary-button" type="submit">Registrar retiro</button>
-              </form>
-            </section>
-
-            <section id="records-section" class="panel records-panel" role="tabpanel" aria-labelledby="show-records" hidden>
-              <div class="panel-heading row-heading">
-                <div>
-                  <p class="eyebrow">Historial</p>
-                  <h2>Registros</h2>
-                  <p class="heading-copy">Abrí un registro para revisar sus datos o darlo de baja.</p>
-                </div>
-                <div class="records-heading-side">
-                  <button id="reload-records" class="quiet-button" type="button">
-                    <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 8a7 7 0 1 0 1 5M19 4v4h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    <span>Recargar</span>
-                  </button>
-                </div>
-              </div>
-
-              <p id="records-state" class="records-state" role="status"></p>
-              <div id="records-list" class="records-list"></div>
-              <button id="load-more-records" class="secondary-button" type="button" hidden>Ver más</button>
-            </section>
-          </section>
         </section>
 
         <section id="chat-tool" class="tool-panel panel" data-tool-panel="chat" role="tabpanel" aria-labelledby="tab-chat" hidden>
@@ -550,11 +378,7 @@
     </div>
 
     <nav id="bottom-tabs" class="bottom-tabs" role="tablist" aria-label="Herramientas" aria-orientation="horizontal" hidden>
-      <button id="tab-budines" class="bottom-tab is-active" type="button" role="tab" aria-selected="true" aria-controls="budines-tool" data-tool-tab="budines">
-        <svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 10.5c0-2.2 1.8-4 4-4h6c2.2 0 4 1.8 4 4v6.8c0 .7-.6 1.2-1.2 1.2H6.2c-.7 0-1.2-.6-1.2-1.2zM8 6.5V5m4 1.5V4.5m4 2V5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span class="tab-label">Budines</span>
-      </button>
-      <button id="tab-chat" class="bottom-tab" type="button" role="tab" aria-selected="false" aria-controls="chat-tool" data-tool-tab="chat" tabindex="-1">
+      <button id="tab-chat" class="bottom-tab is-active" type="button" role="tab" aria-selected="true" aria-controls="chat-tool" data-tool-tab="chat">
         <svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v12H9l-5 4Z" fill="none" stroke="currentColor" stroke-width="1.8"/></svg><span class="tab-label">Chat</span>
       </button>
       <button id="tab-truco" class="bottom-tab" type="button" role="tab" aria-selected="false" aria-controls="truco-tool" data-tool-tab="truco">
@@ -570,58 +394,6 @@
         <span class="tab-label">Afinador</span>
       </button>
     </nav>
-
-    <div id="void-dialog" class="dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="void-title" hidden>
-      <div class="dialog-panel">
-        <h2 id="void-title">Eliminar registro</h2>
-        <p id="void-copy" class="dialog-copy"></p>
-        <dl id="void-details" class="dialog-details"></dl>
-        <form id="void-form" class="stack" novalidate>
-          <label class="field">
-            <span>Confirmación</span>
-            <input
-              id="void-confirmation"
-              name="confirmation"
-              type="text"
-              autocomplete="off"
-              autocapitalize="characters"
-              spellcheck="false"
-              required
-            >
-          </label>
-          <p class="input-preview">Escribí ELIMINAR para confirmar la baja lógica.</p>
-          <p id="void-error" class="form-message" role="status"></p>
-          <div class="dialog-actions">
-            <button id="void-cancel" class="quiet-button" type="button">Cancelar</button>
-            <button id="void-submit" class="danger-button" type="submit">Eliminar registro</button>
-          </div>
-        </form>
-      </div>
-    </div>
-
-    <div id="owner-summary-dialog" class="dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="owner-summary-title" hidden>
-      <div class="dialog-panel">
-        <h2 id="owner-summary-title">Resumen</h2>
-        <p id="owner-summary-state" class="dialog-copy owner-summary-state" role="status" aria-live="polite"></p>
-        <dl id="owner-summary-details" class="dialog-details owner-summary-details" hidden>
-          <div>
-            <dt>Santi</dt>
-            <dd id="owner-summary-santi"></dd>
-          </div>
-          <div>
-            <dt>Leandro</dt>
-            <dd id="owner-summary-leandro"></dd>
-          </div>
-          <div class="owner-summary-total">
-            <dt>Total general</dt>
-            <dd id="owner-summary-total"></dd>
-          </div>
-        </dl>
-        <div class="dialog-actions owner-summary-actions">
-          <button id="owner-summary-close" class="primary-button" type="button">Cerrar</button>
-        </div>
-      </div>
-    </div>
 
     <div id="truco-reset-dialog" class="dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="truco-reset-title" hidden>
       <div class="dialog-panel">
@@ -703,6 +475,6 @@
     </div>
 
     <p id="live-region" class="sr-only" aria-live="polite" aria-atomic="true"></p>
-    <script type="module" src="/js/app.js?v=offline-chat-20260907"></script>
+    <script type="module" src="/js/app.js?v=tools-only-20261012"></script>
   </body>
 </html>

@@ -46,38 +46,6 @@ export async function logout() {
   });
 }
 
-export async function getSummary() {
-  return apiRequest('/api/summary');
-}
-
-export async function getOwnerSummary() {
-  return apiRequest('/api/owner-summary');
-}
-
-export async function listRecords({ limit = 30, offset = 0 } = {}) {
-  const params = new URLSearchParams({
-    limit: String(limit),
-    offset: String(offset)
-  });
-  return apiRequest(`/api/records?${params}`);
-}
-
-export async function createRecord(record) {
-  return apiRequest('/api/records', {
-    method: 'POST',
-    body: record
-  });
-}
-
-export async function deleteRecord({ id, confirmation }) {
-  return apiRequest(`/api/records/${encodeURIComponent(id)}/void`, {
-    method: 'POST',
-    body: {
-      confirmation
-    }
-  });
-}
-
 async function apiRequest(path, { method = 'GET', body } = {}) {
   const options = {
     method,

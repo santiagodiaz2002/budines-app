@@ -11,20 +11,20 @@ afterEach(() => {
 });
 
 describe('navegacion inferior de herramientas', () => {
-  it('expone las cinco pestañas y Budines inicia activa', () => {
+  it('expone las cuatro pestañas y Chat inicia activo', () => {
     setupDom();
 
     const nav = initToolNavigation();
     const tabs = [...document.querySelectorAll('[data-tool-tab]')];
 
-    expect(tabs).toHaveLength(5);
+    expect(tabs).toHaveLength(4);
     expect(tabs.map((tab) => tab.dataset.toolTab)).toEqual(TOOL_TABS);
-    expect(tabs.map((tab) => tab.textContent.trim())).toEqual(['Budines', 'Chat', 'Truco', 'Metrónomo', 'Afinador']);
-    expect(nav.currentTab).toBe('budines');
-    expect(document.body.dataset.activeTool).toBe('budines');
-    expect(document.querySelector('#budines-tool').hidden).toBe(false);
+    expect(tabs.map((tab) => tab.textContent.trim())).toEqual(['Chat', 'Truco', 'Metrónomo', 'Afinador']);
+    expect(nav.currentTab).toBe('chat');
+    expect(document.body.dataset.activeTool).toBe('chat');
+    expect(document.querySelector('#chat-tool').hidden).toBe(false);
     expect(document.querySelector('#truco-tool').hidden).toBe(true);
-    expect(document.querySelector('#tab-budines').getAttribute('aria-selected')).toBe('true');
+    expect(document.querySelector('#tab-chat').getAttribute('aria-selected')).toBe('true');
   });
 
   it('cambia pestaña sin recargar y mantiene estado accesible', () => {
@@ -33,11 +33,11 @@ describe('navegacion inferior de herramientas', () => {
 
     document.querySelector('#tab-tuner').click();
 
-    expect(document.querySelector('#budines-tool').hidden).toBe(true);
+    expect(document.querySelector('#chat-tool').hidden).toBe(true);
     expect(document.querySelector('#tuner-tool').hidden).toBe(false);
     expect(document.body.dataset.activeTool).toBe('tuner');
     expect(document.querySelector('#tab-tuner').getAttribute('aria-selected')).toBe('true');
-    expect(document.querySelector('#tab-budines').getAttribute('aria-selected')).toBe('false');
+    expect(document.querySelector('#tab-chat').getAttribute('aria-selected')).toBe('false');
   });
 
   it('acepta clicks sobre el icono interno de la pestaña', () => {
@@ -54,7 +54,7 @@ describe('navegacion inferior de herramientas', () => {
     setupDom();
     initToolNavigation();
 
-    document.querySelector('#tab-budines').dispatchEvent(
+    document.querySelector('#tab-chat').dispatchEvent(
       new windowRef.KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true })
     );
     expect(document.querySelector('#tab-tuner').getAttribute('aria-selected')).toBe('true');
@@ -62,9 +62,9 @@ describe('navegacion inferior de herramientas', () => {
     document.querySelector('#tab-tuner').dispatchEvent(
       new windowRef.KeyboardEvent('keydown', { key: 'Home', bubbles: true })
     );
-    expect(document.querySelector('#tab-budines').getAttribute('aria-selected')).toBe('true');
+    expect(document.querySelector('#tab-chat').getAttribute('aria-selected')).toBe('true');
 
-    document.querySelector('#tab-budines').dispatchEvent(
+    document.querySelector('#tab-chat').dispatchEvent(
       new windowRef.KeyboardEvent('keydown', { key: 'End', bubbles: true })
     );
     expect(document.querySelector('#tab-tuner').getAttribute('aria-selected')).toBe('true');
@@ -73,10 +73,8 @@ describe('navegacion inferior de herramientas', () => {
 
   it('permite inicializar solo herramientas locales sin Budines', () => {
     setupDom();
-    document.querySelector('#tab-budines').remove();
     document.querySelector('#tab-chat').remove();
     document.querySelector('#chat-tool').remove();
-    document.querySelector('#budines-tool').remove();
 
     const nav = initToolNavigation({
       allowedTabs: ['truco', 'metronome', 'tuner'],

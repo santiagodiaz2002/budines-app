@@ -175,14 +175,6 @@ export async function requireSession(context) {
   return session;
 }
 
-export async function requireBudinesAccess(context) {
-  const session = await requireSession(context);
-  if (!session.user.canAccessBudines) {
-    throw new ApiError(403, 'forbidden', 'No autorizado.');
-  }
-  return session;
-}
-
 export async function revokeCurrentSession(context) {
   const token = getCookie(context.request.headers.get('Cookie'), SESSION_COOKIE_NAME);
   if (!token) {

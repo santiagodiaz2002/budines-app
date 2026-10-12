@@ -1,9 +1,9 @@
-export const TOOL_TABS = ['budines', 'chat', 'truco', 'metronome', 'tuner'];
+export const TOOL_TABS = ['chat', 'truco', 'metronome', 'tuner'];
 
 export function initToolNavigation({
   nav = document.querySelector('#bottom-tabs'),
   panels = [...document.querySelectorAll('[data-tool-panel]')],
-  initialTab = 'budines',
+  initialTab = 'chat',
   allowedTabs = TOOL_TABS,
   onChange = () => {}
 } = {}) {

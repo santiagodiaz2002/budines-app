@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS app_users (
   password_salt TEXT NOT NULL,
   password_algorithm TEXT NOT NULL,
   password_iterations INTEGER NOT NULL,
+  password_kdf_version INTEGER NOT NULL DEFAULT 1 CHECK (password_kdf_version IN (1, 2)),
   role TEXT NOT NULL DEFAULT 'common',
   can_access_budines INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL,
@@ -61,6 +62,12 @@ CREATE INDEX IF NOT EXISTS idx_app_sessions_user_expires ON app_sessions(user_id
 CREATE INDEX IF NOT EXISTS idx_app_sessions_expires ON app_sessions(expires_at);
 CREATE INDEX IF NOT EXISTS idx_auth_rate_limits_updated ON auth_rate_limits(updated_at);
 
-UPDATE sessions
-SET revoked_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-WHERE revoked_at IS NULL;
+
+CREATE TABLE IF NOT EXISTS chat_messages (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id TEXT NOT NULL REFERENCES app_users(id),
+  content TEXT NOT NULL CHECK (length(content) BETWEEN 1 AND 2000),
+  request_id TEXT NOT NULL CHECK (length(request_id) = 36),
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  UNIQUE (user_id, request_id)
+);

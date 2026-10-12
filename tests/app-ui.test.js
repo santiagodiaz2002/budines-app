@@ -1,0 +1,120 @@
+import { readFileSync } from 'node:fs';
+import { Window } from 'happy-dom';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createSong } from '../public/js/metronome-core-v2.js';
+
+const html = readFileSync('public/index.html', 'utf8');
+const owner = { id: 'santi', displayName: 'Santi', capabilities: { canAccessBudines: true } };
+let windowRef;
+let fetchCalls;
+
+beforeEach(() => {
+  fetchCalls = [];
+  windowRef = new Window({ url: 'https://budines.test/' });
+  windowRef.document.write(html);
+  windowRef.document.close();
+  vi.stubGlobal('window', windowRef);
+  vi.stubGlobal('document', windowRef.document);
+  vi.stubGlobal('navigator', { onLine: true });
+  vi.stubGlobal('fetch', vi.fn(async input => {
+    const url = new URL(String(input), 'https://budines.test');
+    fetchCalls.push(url.pathname);
+    if (url.pathname === '/api/session') return json({ ok: true, authenticated: true, user: owner });
+    if (url.pathname === '/api/chat') return json({ ok: true, messages: [], hasMore: false });
+    throw new Error('Ruta inesperada: ' + url.pathname);
+  }));
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+  windowRef?.close();
+});
+
+describe('app sin contabilidad', () => {
+  it('un owner abre Chat y no solicita ninguna API comercial', async () => {
+    await importApp();
+    expect(document.querySelector('#chat-tool').hidden).toBe(false);
+    expect([...document.querySelectorAll('[data-tool-tab]')].map(tab => tab.dataset.toolTab)).toEqual([
+      'chat', 'truco', 'metronome', 'tuner'
+    ]);
+    for (const id of ['budines-tool', 'tab-budines', 'sale-form', 'withdrawal-form', 'records-list', 'void-dialog', 'owner-summary-dialog']) {
+      expect(document.getElementById(id)).toBeNull();
+    }
+    expect(fetchCalls).toContain('/api/session');
+    expect(fetchCalls).toContain('/api/chat');
+    expect(fetchCalls.every(path => ['/api/session', '/api/chat'].includes(path))).toBe(true);
+  });
+
+  it('conserva puntajes, visual de Truco y canciones guardadas al abrir y navegar', async () => {
+    const trucoKey = 'budines.truco.v1.user.santi';
+    const visualKey = 'budines.truco.visual.v1.user.santi';
+    const songsKey = 'budines.metronome.songs.v2.user.santi';
+    const savedTruco = JSON.stringify({ scores: { nosotros: 7, ellos: 3 }, history: [] });
+    const created = createSong({
+      name: 'Canción guardada',
+      blocks: [{ id: 'intro', name: 'Intro', measures: 4, bpm: 110, order: 0 }],
+      now: '2026-10-01T12:00:00.000Z',
+      idFactory: () => 'saved-song'
+    });
+    expect(created.ok).toBe(true);
+    const savedSongs = JSON.stringify({ schemaVersion: 2, songs: [created.song] });
+    windowRef.localStorage.setItem(trucoKey, savedTruco);
+    windowRef.localStorage.setItem(visualKey, 'joint');
+    windowRef.localStorage.setItem(songsKey, savedSongs);
+
+    await importApp();
+    document.querySelector('#tab-truco').click();
+    expect(document.querySelector('[data-truco-team="nosotros"] [data-truco-score]').textContent).toBe('7');
+    expect(document.querySelector('#truco-tool').dataset.trucoVisualModel).toBe('joint');
+    document.querySelector('#tab-metronome').click();
+    expect(document.querySelector('#metronome-song-list').textContent).toContain('Canción guardada');
+    document.querySelector('#tab-tuner').click();
+    expect(document.querySelector('#tuner-tool').hidden).toBe(false);
+    expect(document.querySelector('#tuner-start').disabled).toBe(false);
+    expect(windowRef.localStorage.getItem(trucoKey)).toBe(savedTruco);
+    expect(windowRef.localStorage.getItem(visualKey)).toBe('joint');
+    expect(windowRef.localStorage.getItem(songsKey)).toBe(savedSongs);
+
+    document.querySelector('#tab-truco').click();
+    document.querySelector('[data-truco-team-target="nosotros"][data-truco-action="add"]').click();
+    expect(JSON.parse(windowRef.localStorage.getItem(trucoKey)).scores.nosotros).toBe(8);
+    expect(windowRef.localStorage.getItem(songsKey)).toBe(savedSongs);
+  });
+
+  it.each(['truco-reset-dialog', 'metronome-config-dialog', 'metronome-name-dialog', 'metronome-confirm-dialog'])(
+    'mantiene el foco de teclado dentro de %s', async dialogId => {
+      await importApp();
+      const dialog = document.getElementById(dialogId);
+      dialog.hidden = false;
+      const focusable = [...dialog.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled])')];
+      for (const element of focusable) {
+        vi.spyOn(element, 'getClientRects').mockReturnValue([{}]);
+      }
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      const tab = shiftKey => document.dispatchEvent(new windowRef.KeyboardEvent('keydown', {
+        key: 'Tab', shiftKey, bubbles: true, cancelable: true
+      }));
+
+      last.focus();
+      tab(false);
+      expect(document.activeElement).toBe(first);
+      tab(true);
+      expect(document.activeElement).toBe(last);
+      document.querySelector('#logout-button').focus();
+      tab(false);
+      expect(document.activeElement).toBe(first);
+    }
+  );
+});
+
+async function importApp() {
+  vi.resetModules();
+  await import('../public/js/app.js');
+  await vi.waitFor(() => expect(document.body.dataset.authState).toBe('app'));
+}
+
+function json(payload) {
+  return new Response(JSON.stringify(payload), { headers: { 'Content-Type': 'application/json' } });
+}

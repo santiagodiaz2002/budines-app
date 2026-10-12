@@ -1,0 +1,276 @@
+import { readFileSync } from 'node:fs';
+import { Window } from 'happy-dom';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const html = readFileSync('public/index.html', 'utf8');
+
+let windowRef;
+let fetchCalls;
+let sessionUser;
+let loginUser;
+let registerUser;
+
+beforeEach(() => {
+  fetchCalls = [];
+  sessionUser = null;
+  loginUser = null;
+  registerUser = null;
+  setupWindow();
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+  windowRef?.close();
+});
+
+describe('pantalla de acceso y permisos de UI', () => {
+  it('fallo de red al arrancar permite Truco y conserva su perfil sin permisos privados', async () => {
+    windowRef.localStorage.setItem('budines.local.profile.v1', JSON.stringify({ id: 'santi', displayName: 'Santi', capabilities: { canAccessBudines: true } }));
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
+    await importApp();
+    await waitFor(() => document.body.dataset.authState === 'app');
+    expect(document.querySelector('#truco-tool').hidden).toBe(false);
+    expect(document.querySelector('#budines-tool')).toBeNull();
+    expect(document.querySelector('#connection-notice').hidden).toBe(false);
+    document.querySelector('[data-truco-action="add"]').click();
+    expect(windowRef.localStorage.getItem('budines.truco.v1.user.santi')).not.toBeNull();
+    document.querySelector('#tab-chat').click();
+    expect(document.querySelector('#chat-status').textContent).toContain('requiere conexión');
+    expect(document.querySelector('#chat-send').disabled).toBe(true);
+  });
+
+  it('sin sesión muestra solo login/registro con usuario y contraseña', async () => {
+    await importApp();
+    await waitFor(() => !document.querySelector('#auth-view').hidden);
+
+    const inputs = [...document.querySelectorAll('#auth-form input')].map((input) => input.name);
+
+    expect(document.body.dataset.authState).toBe('auth');
+    expect(document.querySelector('#bottom-tabs').hidden).toBe(true);
+    expect(document.querySelector('#auth-title').tagName).toBe('H1');
+    expect(document.querySelector('.skip-link').getAttribute('href')).toBe('#main-content');
+    expect(document.querySelector('#main-content').tabIndex).toBe(-1);
+    expect(inputs).toEqual(['username', 'password']);
+    expect(document.querySelector('#auth-username').autocomplete).toBe('username');
+    expect(document.querySelector('#auth-password').autocomplete).toBe('current-password');
+
+    document.querySelector('#auth-password-toggle').click();
+    expect(document.querySelector('#auth-password').type).toBe('text');
+    expect(document.querySelector('#auth-password-toggle').textContent).toBe('Ocultar');
+
+    document.querySelector('#auth-mode-register').click();
+    expect(document.querySelector('#auth-submit').textContent).toBe('Crear cuenta');
+    expect(document.querySelector('#auth-password').autocomplete).toBe('new-password');
+  });
+
+  it('registro común inicia sesión y abre Chat sin sección comercial', async () => {
+    registerUser = {
+      id: 'user-common-1',
+      displayName: 'Comun',
+      capabilities: {
+        canAccessBudines: false
+      }
+    };
+
+    await importApp();
+    await waitFor(() => !document.querySelector('#auth-view').hidden);
+    document.querySelector('#auth-mode-register').click();
+    document.querySelector('#auth-username').value = 'Comun';
+    document.querySelector('#auth-password').value = 'common-password';
+    document.querySelector('#auth-form').dispatchEvent(new windowRef.Event('submit', { bubbles: true, cancelable: true }));
+
+    await waitFor(() => document.body.dataset.authState === 'app');
+
+    expect(document.querySelector('#tab-budines')).toBeNull();
+    expect(document.querySelector('#budines-tool')).toBeNull();
+    expect(document.querySelector('#owner-summary-button')).toBeNull();
+    expect([...document.querySelectorAll('[data-tool-tab]')].map((tab) => tab.dataset.toolTab)).toEqual([
+      'chat',
+      'truco',
+      'metronome',
+      'tuner'
+    ]);
+    expect(document.querySelector('#chat-tool').hidden).toBe(false);
+    expect(fetchCalls.some((call) => call.path === '/api/summary')).toBe(false);
+    expect(fetchCalls.some((call) => call.path === '/api/owner-summary')).toBe(false);
+    expect(fetchCalls.some((call) => call.path === '/api/records')).toBe(false);
+    expect(document.querySelector('#session-badge').textContent).toBe('Comun');
+    expect(document.querySelector('#user-session').textContent).not.toContain('common');
+    expect(document.querySelector('[data-truco-visual="joint"]')).toBeNull();
+    expect(document.querySelector('[data-truco-visual="smoke"]').hidden).toBe(false);
+    expect(document.querySelector('#truco-tool').dataset.trucoVisualModel).toBe('smoke');
+    expect(windowRef.localStorage.getItem('budines.truco.visual.v1.user.user-common-1')).toBe('smoke');
+  });
+
+  it.each([
+    ['santi', 'Santi'],
+    ['leandro', 'Leandro']
+  ])('%s abre Chat y conserva herramientas y opciones visuales', async (id, displayName) => {
+    loginUser = {
+      id,
+      displayName,
+      capabilities: { canAccessBudines: true }
+    };
+
+    await importApp();
+    await waitFor(() => !document.querySelector('#auth-view').hidden);
+    document.querySelector('#auth-username').value = id;
+    document.querySelector('#auth-password').value = 'owner-password';
+    document.querySelector('#auth-form').dispatchEvent(new windowRef.Event('submit', { bubbles: true, cancelable: true }));
+    await waitFor(() => document.body.dataset.authState === 'app');
+
+    expect([...document.querySelectorAll('[data-tool-tab]')].map(tab => tab.dataset.toolTab)).toEqual([
+      'chat', 'truco', 'metronome', 'tuner'
+    ]);
+    expect(document.querySelector('#chat-tool').hidden).toBe(false);
+    expect(document.querySelector('#budines-tool')).toBeNull();
+    expect(document.querySelector('#owner-summary-dialog')).toBeNull();
+    expect(fetchCalls.some(call => ['/api/summary', '/api/owner-summary', '/api/records'].includes(call.path))).toBe(false);
+    expect(document.querySelector('[data-truco-visual="joint"]')).not.toBeNull();
+    expect(document.querySelector('[data-truco-visual="smoke"]').hidden).toBe(false);
+  });
+
+  it('logout llama backend, cancela voz y vuelve al acceso', async () => {
+    sessionUser = {
+      id: 'santi',
+      displayName: 'Santi',
+      capabilities: {
+        canAccessBudines: true
+      }
+    };
+    windowRef.location.reload = vi.fn();
+
+    await importApp();
+    await waitFor(() => document.body.dataset.authState === 'app');
+    document.querySelector('#logout-button').click();
+    await waitFor(() => document.body.dataset.authState === 'auth');
+
+    expect(fetchCalls.some((call) => call.path === '/api/logout')).toBe(true);
+    expect(windowRef.speechSynthesis.cancel).toHaveBeenCalled();
+  });
+});
+
+async function importApp() {
+  vi.resetModules();
+  await import('../public/js/app.js');
+}
+
+function setupWindow() {
+  windowRef?.close();
+  windowRef = new Window({ url: 'https://budines.test/' });
+  windowRef.document.write(html);
+  windowRef.document.close();
+
+  class FakeUtterance {
+    constructor(text) {
+      this.text = text;
+    }
+  }
+
+  vi.stubGlobal('window', windowRef);
+  vi.stubGlobal('document', windowRef.document);
+  vi.stubGlobal('navigator', {
+    serviceWorker: {
+      register: vi.fn().mockResolvedValue({})
+    }
+  });
+  vi.stubGlobal('HTMLElement', windowRef.HTMLElement);
+  vi.stubGlobal('Event', windowRef.Event);
+  vi.stubGlobal('KeyboardEvent', windowRef.KeyboardEvent);
+  vi.stubGlobal('MouseEvent', windowRef.MouseEvent);
+  vi.stubGlobal('crypto', {
+    randomUUID: vi.fn(() => 'ui-uuid')
+  });
+  vi.stubGlobal('fetch', vi.fn(handleFetch));
+  windowRef.SpeechSynthesisUtterance = FakeUtterance;
+  windowRef.speechSynthesis = {
+    getVoices: vi.fn(() => []),
+    speak: vi.fn(),
+    cancel: vi.fn(),
+    addEventListener: vi.fn()
+  };
+}
+
+async function handleFetch(input, options = {}) {
+  const url = new URL(String(input), 'https://budines.test');
+  const method = options.method || 'GET';
+  fetchCalls.push({ path: url.pathname, method });
+
+  if (url.pathname === '/api/chat') return json({ ok: true, messages: [], hasMore: false });
+
+  if (url.pathname === '/api/session') {
+    return json({
+      ok: true,
+      authenticated: Boolean(sessionUser),
+      user: sessionUser
+    });
+  }
+
+  if (url.pathname === '/api/register' && method === 'POST') {
+    sessionUser = registerUser;
+    return json(
+      {
+        ok: true,
+        user: registerUser
+      },
+      201,
+      {
+        'Set-Cookie': 'budines_session=registered; Path=/; HttpOnly; Secure; SameSite=Lax'
+      }
+    );
+  }
+
+  if (url.pathname === '/api/login' && method === 'POST') {
+    sessionUser = loginUser;
+    return json(
+      {
+        ok: true,
+        user: loginUser
+      },
+      200,
+      {
+        'Set-Cookie': 'budines_session=logged; Path=/; HttpOnly; Secure; SameSite=Lax'
+      }
+    );
+  }
+
+  if (url.pathname === '/api/logout' && method === 'POST') {
+    sessionUser = null;
+    return json({ ok: true }, 200, {
+      'Set-Cookie': 'budines_session=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0'
+    });
+  }
+
+  return json(
+    {
+      ok: false,
+      error: {
+        code: 'not_found',
+        message: 'No encontrado.'
+      }
+    },
+    404
+  );
+}
+
+function json(payload, status = 200, headers = {}) {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: {
+      'Content-Type': 'application/json',
+      ...headers
+    }
+  });
+}
+
+async function waitFor(predicate) {
+  const deadline = Date.now() + 1000;
+  while (Date.now() < deadline) {
+    if (predicate()) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  throw new Error('waitFor timeout');
+}
