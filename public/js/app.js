@@ -3,7 +3,7 @@ import { createAudioCoordinator } from './audio-coordinator.js';
 import { initMetronome } from './metronome-editor.js?v=songbook-20261012';
 import { initToolNavigation } from './navigation.js?v=tools-only-20261012';
 import { initTruco } from './truco.js?v=joint-access-20260805';
-import { initTuner } from './tuner.js?v=redesign13-20260730';
+import { initTuner } from './tuner.js?v=tuner-20261012';
 import { clearLocalStorageUser, setLocalStorageUser } from './local-storage.js?v=auth-20260723';
 import { rememberLocalProfile, readLocalProfile, forgetLocalProfile } from './local-profile.js?v=offline-chat-20260907';
 import { initChat } from './chat.js?v=offline-chat-20260907';
@@ -261,7 +261,10 @@ function initNavigationForUser() {
   state.tools.navigation = initToolNavigation({
     allowedTabs: APP_TABS,
     initialTab: 'chat',
-    onChange: () => chat?.refresh()
+    onChange: (tab) => {
+      if (tab !== 'tuner') state.tools.tuner?.stop?.();
+      chat?.refresh();
+    }
   });
 }
 

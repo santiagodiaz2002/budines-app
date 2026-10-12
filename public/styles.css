@@ -1756,8 +1756,8 @@ input[type="range"] {
 }
 
 .meter-zone--center {
-  right: 44%;
-  left: 44%;
+  right: 45%;
+  left: 45%;
   background: rgba(69, 207, 159, 0.16);
 }
 
@@ -1777,7 +1777,7 @@ input[type="range"] {
   border-radius: var(--radius-pill);
   background: var(--color-warning);
   box-shadow: 0 0 10px rgba(230, 185, 101, 0.28);
-  opacity: 0.24;
+  opacity: 0;
   transform: translateX(-50%);
   transition: left 90ms linear, opacity var(--duration-fast) ease;
 }
@@ -1785,6 +1785,23 @@ input[type="range"] {
 #tuner-tool[data-tuner-state="signal"] .meter-needle,
 #tuner-tool[data-tuner-state="in-tune"] .meter-needle {
   opacity: 1;
+}
+
+#tuner-tool .tuner-deviation {
+  grid-template-columns: 1fr;
+  text-align: center;
+}
+
+#tuner-cents {
+  font-size: clamp(1.4rem, 6vw, 1.8rem);
+}
+
+#tuner-tool .row-heading {
+  flex-wrap: wrap;
+}
+
+#tuner-mic-state {
+  flex-shrink: 0;
 }
 
 #tuner-tool[data-tuner-state="listening"] #tuner-mic-state,

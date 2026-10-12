@@ -52,6 +52,28 @@ afterEach(() => {
 });
 
 describe('app sin contabilidad', () => {
+  it('salir del afinador cancela el permiso pendiente y libera la captura tardía', async () => {
+    let resolveStream;
+    const track = { stop: vi.fn() };
+    const getUserMedia = vi.fn(() => new Promise(resolve => { resolveStream = resolve; }));
+    vi.stubGlobal('navigator', { onLine: true, mediaDevices: { getUserMedia } });
+    Object.defineProperty(windowRef, 'isSecureContext', { value: true, configurable: true });
+    windowRef.AudioContext = class extends windowRef.EventTarget {
+      state = 'running';
+      resume() { return Promise.resolve(); }
+      close() { this.state = 'closed'; return Promise.resolve(); }
+    };
+    await importApp();
+    document.querySelector('#tab-tuner').click();
+    document.querySelector('#tuner-start').click();
+    await vi.waitFor(() => expect(getUserMedia).toHaveBeenCalledTimes(1));
+    document.querySelector('#tab-truco').click();
+    expect(document.querySelector('#tuner-tool').dataset.tunerState).toBe('stopped');
+    resolveStream({ getTracks: () => [track], getAudioTracks: () => [track] });
+    await vi.waitFor(() => expect(track.stop).toHaveBeenCalledTimes(1));
+    expect(document.querySelector('#tuner-tool').dataset.tunerState).toBe('stopped');
+  });
+
   it('un owner abre Chat y no solicita ninguna API comercial', async () => {
     await importApp();
     expect(document.querySelector('#chat-tool').hidden).toBe(false);

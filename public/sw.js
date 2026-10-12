@@ -1,13 +1,13 @@
-const CACHE_NAME = 'budines-shell-v38-songbook';
+const CACHE_NAME = 'budines-shell-v39-tuner';
 const SHELL_ASSETS = [
   '/',
-  '/styles.css?v=songbook-20261012',
+  '/styles.css?v=tuner-20261012',
   '/js/audio-coordinator.js',
   '/js/chat.js?v=offline-chat-20260907',
   '/js/local-profile.js?v=offline-chat-20260907',
   '/js/api.js?v=tools-only-20261012',
   '/js/api.js?v=offline-chat-20260907',
-  '/js/app.js?v=songbook-20261012',
+  '/js/app.js?v=tuner-20261012',
   '/js/local-storage.js?v=auth-20260723',
   '/js/metronome-core.js',
   '/js/metronome-core-v2.js?v=songbook-20261012',
@@ -16,8 +16,8 @@ const SHELL_ASSETS = [
   '/js/songbook-client.js?v=songbook-20261012',
   '/js/navigation.js?v=tools-only-20261012',
   '/js/truco.js?v=joint-access-20260805',
-  '/js/tuner-core.js',
-  '/js/tuner.js?v=redesign13-20260730',
+  '/js/tuner-core.js?v=tuner-20261012',
+  '/js/tuner.js?v=tuner-20261012',
   '/manifest.webmanifest',
   '/branding/logo-luz-en-ruinas.png',
   '/media/joint-clean.png',

@@ -474,10 +474,10 @@ describe('Truco a 30', () => {
     const app = readFileSync('public/js/app.js', 'utf8');
     const serviceWorker = readFileSync('public/sw.js', 'utf8');
 
-    expect(html).toContain('/js/app.js?v=songbook-20261012');
+    expect(html).toContain('/js/app.js?v=tuner-20261012');
     expect(app).toContain("./truco.js?v=joint-access-20260805");
-    expect(serviceWorker).toContain("budines-shell-v38-songbook");
-    expect(serviceWorker).toContain('/js/app.js?v=songbook-20261012');
+    expect(serviceWorker).toContain("budines-shell-v39-tuner");
+    expect(serviceWorker).toContain('/js/app.js?v=tuner-20261012');
     expect(serviceWorker).toContain('/js/truco.js?v=joint-access-20260805');
   });
 });

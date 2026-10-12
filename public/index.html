@@ -15,7 +15,7 @@
     <link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
     <link rel="icon" href="/icons/favicon-16.png" sizes="16x16" type="image/png">
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
-    <link rel="stylesheet" href="/styles.css?v=songbook-20261012">
+    <link rel="stylesheet" href="/styles.css?v=tuner-20261012">
   </head>
   <body data-auth-state="booting">
     <a class="skip-link" href="#main-content">Saltar al contenido</a>
@@ -348,13 +348,19 @@
             </div>
             <p id="tuner-status" class="tool-status" role="status"></p>
 
-            <div class="tuner-display" aria-live="polite">
+            <div class="tuner-display">
               <p id="tuner-reference" class="tuner-reference"></p>
               <div class="tuner-note">
-                <span id="tuner-note">A</span>
-                <small id="tuner-octave">4</small>
+                <span id="tuner-note">—</span>
+                <small id="tuner-octave"></small>
               </div>
               <p id="tuner-verdict" class="tuner-verdict">Detenido</p>
+              <dl class="metrics-grid tuner-deviation">
+                <div>
+                  <dt>Desvío</dt>
+                  <dd id="tuner-cents">— cents</dd>
+                </div>
+              </dl>
               <p id="tuner-guidance" class="tuner-guidance">Iniciá el micrófono y tocá una nota.</p>
               <div class="tuner-meter" aria-hidden="true">
                 <span>Grave</span>
@@ -373,11 +379,7 @@
                 </div>
                 <div>
                   <dt>Objetivo</dt>
-                  <dd id="tuner-target">440.0 Hz</dd>
-                </div>
-                <div>
-                  <dt>Desvío</dt>
-                  <dd id="tuner-cents">-- cents</dd>
+                  <dd id="tuner-target">-- Hz</dd>
                 </div>
               </dl>
             </div>
@@ -484,6 +486,6 @@
     </div>
 
     <p id="live-region" class="sr-only" aria-live="polite" aria-atomic="true"></p>
-    <script type="module" src="/js/app.js?v=songbook-20261012"></script>
+    <script type="module" src="/js/app.js?v=tuner-20261012"></script>
   </body>
 </html>
