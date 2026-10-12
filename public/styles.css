@@ -1570,6 +1570,16 @@ input[type="range"] {
   gap: 9px;
 }
 
+.songbook-navigation { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.folder-card { display: grid; gap: 10px; }
+.song-folder { min-width: 0; flex: 1 1 180px; }
+.song-folder select { width: 100%; min-width: 0; }
+.part-ramp { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding-top: 12px; border-top: 1px solid var(--color-border); }
+.part-ramp > label:first-child { flex: 1 1 100%; }
+.part-ramp .compact-field { flex: 1 1 120px; min-width: 0; }
+.part-ramp small { flex: 1 1 100%; }
+.part-ramp input[type="checkbox"] { width: auto; }
+
 .song-card {
   display: grid;
   gap: var(--space-3);

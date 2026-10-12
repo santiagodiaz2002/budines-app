@@ -3,28 +3,24 @@ import {
   DEFAULT_BLOCKS,
   MAX_PARTS,
   advancePlaybackRuntime,
-  cloneSongAsNew,
   createDefaultNamedBlock,
   createPlaybackRuntime,
-  createSong,
-  deleteSongFromLibrary,
-  findSong,
   getAnnouncementWord,
   getCurrentBlock,
   getNextBlock,
+  getPlaybackBpm,
+  getPlaybackInterval,
   normalizeBlocks,
   parseBpm,
   parsePartName,
   parseSongName,
-  renameSongInLibrary,
   sanitizeSongLibrary,
   selectPreferredVoice,
   serializeSongDraft,
-  updateSong,
-  upsertSongInLibrary,
   validateEditableBlocks
-} from './metronome-core-v2.js?v=metronome-continuous-20260716';
+} from './metronome-core-v2.js?v=songbook-20261012';
 import { getStorage, scopedStorageKey } from './local-storage.js?v=auth-20260723';
+import { createSongbookClient } from './songbook-client.js?v=songbook-20261012';
 
 const STORAGE_KEY = 'budines.metronome.v1';
 const SONGS_STORAGE_KEY = 'budines.metronome.songs.v2';
@@ -36,7 +32,7 @@ const SCHEDULE_AHEAD_SECONDS = 0.12;
 const SCHEDULER_MS = 25;
 const ASSET_VERSION = 'metronome-continuous-20260716';
 
-export function initMetronome(root = document.querySelector('#metronome-tool'), coordinator) {
+export function initMetronome(root = document.querySelector('#metronome-tool'), coordinator, options = {}) {
   if (!root) {
     return null;
   }
@@ -45,10 +41,10 @@ export function initMetronome(root = document.querySelector('#metronome-tool'), 
   const saved = readState();
   const libraryRead = readLibrary();
   let library = libraryRead.library;
-  let currentSongId = library.songs.some((song) => song.id === saved.currentSongId) ? saved.currentSongId : null;
-  let songName = currentSongId ? findSong(library, currentSongId).name : '';
-  let blocks = currentSongId ? cloneBlocks(findSong(library, currentSongId).blocks) : cloneBlocks(saved.blocks);
-  let savedSnapshot = serializeSongDraft({ name: songName, blocks });
+  let currentSongId = (saved.sharedSong && options.authenticated === true) || library.songs.some((song) => song.id === saved.currentSongId) ? saved.currentSongId : null;
+  let songName = findSong(library, currentSongId)?.name || saved.songName;
+  let blocks = findSong(library, currentSongId) ? cloneBlocks(findSong(library, currentSongId).blocks) : cloneBlocks(saved.blocks);
+  let savedSnapshot = saved.savedSnapshot || serializeSongDraft({ name: songName, blocks });
   let dialogSnapshot = savedSnapshot;
   let dialogBlocksSnapshot = cloneBlocks(blocks);
   let dialogNameSnapshot = songName;
@@ -61,6 +57,20 @@ export function initMetronome(root = document.querySelector('#metronome-tool'), 
   let idCounter = 0;
   let pendingNameDialog = null;
   let pendingConfirmDialog = null;
+  const songbook = options.client || createSongbookClient();
+  let authenticated = options.authenticated === true;
+  let ready = false;
+  let folders = [];
+  let activeFolderId = null;
+  let songFolderId = saved.songFolderId;
+  let currentRevision = saved.sharedSong ? saved.currentRevision : null;
+  let generation = 0;
+  let mutationVersion = 0;
+  let refreshing = false;
+  let pendingCreate = saved.pendingCreate;
+  let pendingFolderCreation = saved.pendingFolderCreation;
+  let playbackOperation = 0;
+  let startingAudio = false;
 
   const speech = new MetronomeSpeech({
     onVoicesChanged: () => {
@@ -94,18 +104,23 @@ export function initMetronome(root = document.querySelector('#metronome-tool'), 
   coordinator?.register('metronome', stop);
   bindEvents();
 
-  if (libraryRead.discardedCount > 0) {
-    setSongMessage(`Se descartaron ${libraryRead.discardedCount} canciones locales inválidas.`);
-  }
-  if (libraryRead.migratedCount > 0) {
-    persistLibrary();
-    setSongMessage(`Se migraron ${libraryRead.migratedCount} canciones locales.`);
-  }
-
   renderAll();
   updateButtons();
+  setSession({ authenticated });
+  const refreshTimer = getBrowserWindow().setInterval(() => {
+    if (authenticated && ready && !root.hidden && document.visibilityState !== 'hidden' && dom.dialog.hidden && !saving) refreshLibrary();
+  }, 15000);
+  getBrowserWindow().addEventListener('online', () => { if (authenticated) refreshLibrary({ importLocal: true }); });
+  getBrowserWindow().addEventListener('focus', () => { if (authenticated && dom.dialog.hidden) refreshLibrary(); });
+  getBrowserWindow().addEventListener('beforeunload', (event) => {
+    if (isDirty() || saving) { event.preventDefault(); event.returnValue = ''; }
+  });
 
   function bindEvents() {
+    dom.refresh.addEventListener('click', () => refreshLibrary({ importLocal: true }));
+    dom.newFolder.addEventListener('click', () => editFolder());
+    dom.folderBack.addEventListener('click', () => { activeFolderId = null; renderLibrary(); });
+    dom.folderList.addEventListener('click', handleFolderClick);
     dom.start.addEventListener('click', start);
     dom.pause.addEventListener('click', togglePause);
     dom.stop.addEventListener('click', () => stop());
@@ -125,6 +140,7 @@ export function initMetronome(root = document.querySelector('#metronome-tool'), 
     dom.songName.addEventListener('input', () => {
       songName = dom.songName.value;
       renderEditor();
+      persistState();
     });
     dom.dialog.addEventListener('click', (event) => {
       if (event.target === dom.dialog) {
@@ -160,16 +176,26 @@ export function initMetronome(root = document.querySelector('#metronome-tool'), 
   }
 
   async function start() {
+    if (running || startingAudio) return;
+    const operation = ++playbackOperation;
+    startingAudio = true;
+    updateButtons();
     const parsed = parseBpm(dom.bpm.value);
     if (!parsed.ok) {
+      startingAudio = false;
+      updateButtons();
       setStatus(parsed.message);
       dom.bpm.focus();
       return;
     }
+    if (!validatePlaybackDraft()) { startingAudio = false; updateButtons(); return; }
 
     await requestAudioFocus();
+    if (operation !== playbackOperation) return;
     const startRuntime = createPlaybackRuntime(playbackBlocks());
     const started = await audio.start({ runtime: startRuntime, blocks: playbackBlocks() });
+    if (operation !== playbackOperation) return;
+    startingAudio = false;
     if (!started) {
       running = false;
       paused = false;
@@ -185,14 +211,21 @@ export function initMetronome(root = document.querySelector('#metronome-tool'), 
     renderPlayback();
   }
 
-  function togglePause() {
+  async function togglePause() {
     if (!running) {
       return;
     }
 
     if (paused) {
+      if (startingAudio) return;
+      const operation = ++playbackOperation;
+      startingAudio = true;
+      updateButtons();
+      const resumed = await audio.resume({ runtime, blocks: playbackBlocks() });
+      if (operation !== playbackOperation) return;
+      startingAudio = false;
+      if (!resumed) { updateButtons(); return; }
       paused = false;
-      audio.resume({ runtime, blocks: playbackBlocks() });
       setStatus('Metrónomo reanudado.');
     } else {
       paused = true;
@@ -203,6 +236,8 @@ export function initMetronome(root = document.querySelector('#metronome-tool'), 
   }
 
   function stop({ silent = false } = {}) {
+    playbackOperation++;
+    startingAudio = false;
     audio.stop();
     running = false;
     paused = false;
@@ -215,9 +250,16 @@ export function initMetronome(root = document.querySelector('#metronome-tool'), 
   }
 
   async function restart() {
+    const operation = ++playbackOperation;
+    startingAudio = true;
+    updateButtons();
+    if (!validatePlaybackDraft()) { startingAudio = false; updateButtons(); return; }
     await requestAudioFocus();
+    if (operation !== playbackOperation) return;
     const startRuntime = createPlaybackRuntime(playbackBlocks());
     const started = await audio.restart({ runtime: startRuntime, blocks: playbackBlocks() });
+    if (operation !== playbackOperation) return;
+    startingAudio = false;
     if (!started) {
       running = false;
       paused = false;
@@ -252,27 +294,12 @@ export function initMetronome(root = document.querySelector('#metronome-tool'), 
       return;
     }
 
-    if (blocks.length <= 1) {
-      blocks = [
-        {
-          ...(blocks[0] || createDefaultNamedBlock(0, parsed.value, { idFactory: createId })),
-          bpm: parsed.value,
-          order: 0
-        }
-      ];
-    } else {
-      blocks = [
-        {
-          id: createId('part'),
-          name: 'Manual',
-          measures: 999,
-          bpm: parsed.value,
-          order: 0
-        }
-      ];
-      currentSongId = null;
-      songName = '';
-    }
+    if (!dom.dialog.hidden) syncBlocksFromDom();
+    if (!blocks.length) blocks = [createDefaultNamedBlock(0, parsed.value, { idFactory: createId })];
+    const index = Math.min(runtime.blockIndex, blocks.length - 1);
+    blocks = blocks.map((block, position) => position === index
+      ? { ...block, bpm: parsed.value, ramp: block.ramp ? { ...block.ramp, enabled: false } : undefined }
+      : block);
 
     runtime = createPlaybackRuntime(playbackBlocks());
     if (running) {
@@ -318,6 +345,7 @@ export function initMetronome(root = document.querySelector('#metronome-tool'), 
   }
 
   function openConfig() {
+    if (saving) return;
     dialogSnapshot = serializeSongDraft({ name: songName, blocks });
     dialogBlocksSnapshot = cloneBlocks(blocks);
     dialogNameSnapshot = songName;
@@ -331,6 +359,7 @@ export function initMetronome(root = document.querySelector('#metronome-tool'), 
   }
 
   function cancelConfigChanges() {
+    if (saving) return;
     songName = dialogNameSnapshot;
     blocks = cloneBlocks(dialogBlocksSnapshot);
     editingPartIndex = null;
@@ -338,10 +367,12 @@ export function initMetronome(root = document.querySelector('#metronome-tool'), 
     dom.dialog.hidden = true;
     clearConfigError();
     renderAll();
+    persistState();
     dom.configure.focus();
   }
 
   function addPart() {
+    if (saving) return;
     syncBlocksFromDom();
     if (blocks.length >= MAX_PARTS) {
       setConfigError(`32 de 32 partes. Eliminá una parte para agregar otra.`);
@@ -353,19 +384,22 @@ export function initMetronome(root = document.querySelector('#metronome-tool'), 
     editingPartIndex = null;
     renderEditableBlocks();
     renderEditor();
+    persistState();
   }
 
   function restoreBasicPart() {
+    if (saving) return;
     blocks = cloneBlocks(DEFAULT_BLOCKS);
     songName = dom.songName.value;
     editingPartIndex = null;
     renderEditableBlocks();
     renderEditor();
+    persistState();
     setStatus('Secuencia básica restaurada.');
   }
 
   async function saveCurrentSong({ asNew = false } = {}) {
-    if (saving) {
+    if (saving || !authenticated || !ready) {
       return;
     }
 
@@ -373,8 +407,10 @@ export function initMetronome(root = document.querySelector('#metronome-tool'), 
       return;
     }
 
-    songName = dom.songName.value;
-    syncBlocksFromDom();
+    if (!dom.dialog.hidden) {
+      songName = dom.songName.value;
+      syncBlocksFromDom();
+    }
     const nameValidation = parseSongName(songName);
     if (!nameValidation.ok) {
       setConfigError(nameValidation.message);
@@ -399,44 +435,31 @@ export function initMetronome(root = document.querySelector('#metronome-tool'), 
     }
 
     saving = true;
+    const sessionTicket = generation;
+    let refreshAfterSave = false;
     updateButtons();
     try {
-      const now = new Date().toISOString();
-      let result;
-      if (asNew || !currentSongId) {
-        result = createSong({
-          name: nameValidation.value,
-          blocks: blocksValidation.blocks,
-          now,
-          idFactory: createId
-        });
-      } else {
-        const existing = findSong(library, currentSongId);
-        result = existing
-          ? updateSong(existing, {
-              name: nameValidation.value,
-              blocks: blocksValidation.blocks,
-              now,
-              idFactory: createId
-            })
-          : createSong({ name: nameValidation.value, blocks: blocksValidation.blocks, now, idFactory: createId });
+      const submitted = { name: nameValidation.value, blocks: blocksValidation.blocks, folderId: songFolderId };
+      const submittedSnapshot = serializeSongDraft(submitted);
+      const creating = asNew || !currentSongId || pendingCreate?.snapshot === submittedSnapshot;
+      if (creating && pendingCreate?.snapshot !== submittedSnapshot) {
+        pendingCreate = { snapshot: submittedSnapshot, id: globalThis.crypto.randomUUID() };
       }
-
-      if (!result.ok) {
-        setConfigError(result.message);
-        return;
-      }
-
-      const upsert = upsertSongInLibrary(library, result.song);
-      if (!upsert.ok) {
-        setConfigError(upsert.message);
-        return;
-      }
-
-      library = upsert.library;
-      currentSongId = result.song.id;
-      songName = result.song.name;
-      blocks = cloneBlocks(result.song.blocks);
+      persistState();
+      const response = await songbook.mutate({
+        action: creating ? 'createSong' : 'updateSong',
+        song: { ...submitted, id: creating ? pendingCreate.id : currentSongId, revision: currentRevision }
+      });
+      if (sessionTicket !== generation || !authenticated) return;
+      mutationVersion++;
+      const song = response.song;
+      library.songs = [...library.songs.filter((item) => item.id !== song.id), song];
+      currentSongId = song.id;
+      currentRevision = song.revision;
+      songFolderId = song.folderId;
+      songName = song.name;
+      blocks = cloneBlocks(song.blocks);
+      pendingCreate = null;
       savedSnapshot = serializeSongDraft({ name: songName, blocks });
       dialogSnapshot = savedSnapshot;
       dialogBlocksSnapshot = cloneBlocks(blocks);
@@ -447,24 +470,34 @@ export function initMetronome(root = document.querySelector('#metronome-tool'), 
         stop({ silent: true });
       }
       runtime = createPlaybackRuntime(playbackBlocks());
-      persistLibrary();
       persistState();
       renderAll();
       clearConfigError();
       setStatus(asNew ? 'Canción guardada como nueva.' : 'Canción guardada.');
+      setSongMessage('Guardada en el cancionero compartido.');
+    } catch (error) {
+      if (sessionTicket !== generation) return;
+      setConfigError(error.message);
+      setSongMessage(error.message);
+      refreshAfterSave = error.status === 409;
     } finally {
-      saving = false;
-      updateButtons();
+      if (sessionTicket === generation) {
+        saving = false; updateButtons();
+        if (refreshAfterSave) await refreshLibrary();
+      }
     }
   }
 
   async function startNewSong() {
+    if (saving) return;
     if (!(await confirmDiscardIfNeeded())) {
       return;
     }
 
     stop({ silent: true });
     currentSongId = null;
+    currentRevision = null;
+    songFolderId = activeFolderId;
     songName = '';
     blocks = [];
     savedSnapshot = serializeSongDraft({ name: songName, blocks });
@@ -476,6 +509,7 @@ export function initMetronome(root = document.querySelector('#metronome-tool'), 
   }
 
   async function handleSongListClick(event) {
+    if (saving) return;
     const button = event.target.closest('[data-song-action]');
     if (!button) {
       return;
@@ -497,6 +531,7 @@ export function initMetronome(root = document.querySelector('#metronome-tool'), 
     if (button.dataset.songAction === 'delete') {
       await deleteSong(song);
     }
+    if (button.dataset.songAction === 'move') await moveSong(song, button.closest('.song-card').querySelector('[data-song-folder]').value || null);
   }
 
   async function openSong(song) {
@@ -506,6 +541,8 @@ export function initMetronome(root = document.querySelector('#metronome-tool'), 
 
     stop({ silent: true });
     currentSongId = song.id;
+    currentRevision = song.revision;
+    songFolderId = song.folderId || null;
     songName = song.name;
     blocks = cloneBlocks(song.blocks);
     savedSnapshot = serializeSongDraft({ name: songName, blocks });
@@ -517,9 +554,10 @@ export function initMetronome(root = document.querySelector('#metronome-tool'), 
   }
 
   async function renameSong(song) {
+    if (!authenticated || !ready) return;
     const name = await requestName({
       title: 'Renombrar canción',
-      copy: 'El nuevo nombre queda guardado solo en este dispositivo.',
+      copy: 'El nuevo nombre se comparte con todos los usuarios.',
       initialValue: song.name,
       confirmText: 'Renombrar'
     });
@@ -527,45 +565,43 @@ export function initMetronome(root = document.querySelector('#metronome-tool'), 
       return;
     }
 
-    const result = renameSongInLibrary(library, song.id, name, { now: new Date().toISOString() });
-    if (!result.ok) {
-      setStatus(result.message);
-      return;
-    }
-
-    library = result.library;
-    if (currentSongId === song.id) {
-      songName = findSong(library, song.id).name;
-      savedSnapshot = serializeSongDraft({ name: songName, blocks });
-    }
-    persistLibrary();
-    persistState();
-    renderAll();
-    setStatus('Canción renombrada.');
+    await mutateLibrary(async (isCurrent) => {
+      const response = await songbook.mutate({ action: 'updateSong', song: { ...song, name, revision: currentSongId === song.id ? currentRevision : song.revision } });
+      if (!isCurrent()) return;
+      library.songs = library.songs.map(item => item.id === song.id ? response.song : item);
+      if (currentSongId === song.id) {
+        if (songName === song.name) songName = response.song.name;
+        // Conserve unsaved blocks; the snapshot describes only the server content.
+        savedSnapshot = serializeSongDraft(response.song);
+        currentRevision = response.song.revision;
+      }
+      persistState();
+      renderAll();
+      setStatus('Canción renombrada.');
+    });
   }
 
   async function deleteSong(song) {
+    if (!authenticated || !ready) return;
     const confirmed = await requestConfirm({
       title: 'Eliminar canción',
-      copy: `Se elimina "${song.name}" de este dispositivo. La configuración comercial no se modifica.`,
+      copy: `Se elimina "${song.name}" del cancionero compartido para todos los usuarios.`,
       confirmText: 'Eliminar'
     });
-    const result = deleteSongFromLibrary(library, song.id, { confirmed });
-    if (!result.ok || !result.deleted) {
+    if (!confirmed) {
       setSongMessage('Eliminación cancelada.');
       return;
     }
 
-    library = result.library;
-    if (currentSongId === song.id) {
-      currentSongId = null;
-      songName = '';
-      savedSnapshot = serializeSongDraft({ name: songName, blocks });
-    }
-    persistLibrary();
-    persistState();
-    renderAll();
-    setStatus('Canción eliminada.');
+    await mutateLibrary(async (isCurrent) => {
+      await songbook.mutate({ action: 'deleteSong', id: song.id, revision: song.revision });
+      if (!isCurrent()) return;
+      library.songs = library.songs.filter(item => item.id !== song.id);
+      if (currentSongId === song.id) { currentSongId = null; currentRevision = null; }
+      persistState();
+      renderAll();
+      setStatus('Canción eliminada.');
+    });
   }
 
   async function confirmDiscardIfNeeded() {
@@ -578,6 +614,167 @@ export function initMetronome(root = document.querySelector('#metronome-tool'), 
       copy: 'La canción actual tiene cambios sin guardar. Si continuás, se descartan esos cambios del editor.',
       confirmText: 'Continuar'
     });
+  }
+
+  function setSession(session) {
+    const wasShared = currentRevision !== null || saved.sharedSong;
+    generation++;
+    stop({ silent: true });
+    saving = false;
+    authenticated = session.authenticated === true;
+    ready = false;
+    refreshing = false;
+    folders = [];
+    if (authenticated) {
+      library = { songs: [] };
+      refreshLibrary({ importLocal: true });
+    } else {
+      pendingCreate = null;
+      pendingFolderCreation = null;
+      library = readLibrary().library;
+      closeNameDialog(null);
+      closeConfirmDialog(false);
+      dom.dialog.hidden = true;
+      if (wasShared) {
+        currentSongId = null;
+        currentRevision = null;
+        songName = '';
+        blocks = cloneBlocks(DEFAULT_BLOCKS);
+        savedSnapshot = serializeSongDraft({ name: songName, blocks });
+      }
+      setSongMessage('Sin sesión online: podés reproducir las canciones locales originales. Para guardar o ver el cancionero compartido, iniciá sesión con conexión.');
+    }
+    renderAll();
+  }
+
+  async function refreshLibrary({ importLocal = false } = {}) {
+    if (!authenticated || refreshing || saving) return;
+    const ticket = generation;
+    const version = mutationVersion;
+    refreshing = true;
+    dom.refresh.disabled = true;
+    setSongMessage(importLocal ? 'Recuperando canciones locales y cargando el cancionero…' : 'Actualizando cancionero…');
+    try {
+      const report = importLocal ? await songbook.importLegacy() : null;
+      const response = await songbook.list();
+      if (ticket !== generation || version !== mutationVersion) return;
+      if (report?.mappings?.[currentSongId]) currentSongId = report.mappings[currentSongId];
+      library = { songs: response.songs };
+      folders = response.folders;
+      ready = true;
+      if (activeFolderId && !folders.some(folder => folder.id === activeFolderId)) activeFolderId = null;
+      if (songFolderId && !folders.some(folder => folder.id === songFolderId)) songFolderId = null;
+      const current = getCurrentSong();
+      if (current && currentRevision === null) {
+        currentRevision = current.revision;
+        songFolderId = current.folderId;
+        if (!isDirty()) loadRemoteSong(current);
+      } else if (current && currentRevision !== current.revision) {
+        if (!isDirty() && !running && dom.dialog.hidden) loadRemoteSong(current);
+        else setStatus('Esta canción cambió en otro dispositivo. Tu edición se conserva; guardá como nueva o volvé a abrirla para revisar la versión compartida.');
+      }
+      renderLibrary();
+      renderEditor();
+      const invalid = report?.invalid || 0;
+      setSongMessage(invalid
+        ? `${invalid} entradas locales no se pudieron importar. Los originales se conservan; revisá el formato antes de reintentar.`
+        : 'Cancionero compartido actualizado.');
+    } catch (error) {
+      if (ticket === generation) {
+        if (error.status === 401) {
+          persistState();
+          ready = false; authenticated = false; library = { songs: [] }; folders = [];
+          currentSongId = null; currentRevision = null; songName = ''; blocks = cloneBlocks(DEFAULT_BLOCKS);
+          savedSnapshot = serializeSongDraft({ name: songName, blocks });
+          stop({ silent: true }); renderLibrary(); renderEditor();
+        }
+        setSongMessage(`${error.message} Tu edición y los originales locales se conservan. Usá Actualizar para reintentar.`);
+      }
+    } finally {
+      if (ticket === generation) { refreshing = false; updateButtons(); }
+    }
+  }
+
+  function loadRemoteSong(song) {
+    currentSongId = song.id;
+    currentRevision = song.revision;
+    songFolderId = song.folderId;
+    songName = song.name;
+    blocks = cloneBlocks(song.blocks);
+    savedSnapshot = serializeSongDraft(song);
+    runtime = createPlaybackRuntime(playbackBlocks());
+    dom.bpm.value = String(blocks[0].bpm);
+    renderPlayback();
+  }
+
+  async function mutateLibrary(operation) {
+    if (saving || !authenticated || !ready) return;
+    saving = true;
+    const ticket = generation;
+    const isCurrent = () => ticket === generation && authenticated;
+    mutationVersion++;
+    updateButtons();
+    try { await operation(isCurrent); }
+    catch (error) { if (isCurrent()) { setSongMessage(error.message); setStatus(error.message); } }
+    finally { if (ticket === generation) { saving = false; updateButtons(); } }
+  }
+
+  async function moveSong(song, folderId) {
+    if (folderId === (song.folderId || null)) return;
+    await mutateLibrary(async (isCurrent) => {
+      const response = await songbook.mutate({ action: 'updateSong', song: { ...song, folderId, revision: currentSongId === song.id ? currentRevision : song.revision } });
+      if (!isCurrent()) return;
+      library.songs = library.songs.map(item => item.id === song.id ? response.song : item);
+      if (currentSongId === song.id) { songFolderId = folderId; currentRevision = response.song.revision; }
+      persistState();
+      renderLibrary();
+      setSongMessage('Canción movida. Se conserva su contenido y configuración.');
+    });
+  }
+
+  async function editFolder(folder = null) {
+    if (!authenticated || !ready || saving) return;
+    const name = await requestName({ title: folder ? 'Renombrar carpeta' : 'Nueva carpeta', copy: 'La carpeta se comparte con todos los usuarios.', initialValue: folder?.name || pendingFolderCreation?.name || '' });
+    if (name === null) return;
+    await mutateLibrary(async (isCurrent) => {
+      if (!folder && pendingFolderCreation?.name !== name) pendingFolderCreation = { id: globalThis.crypto.randomUUID(), name };
+      if (!folder) persistState();
+      const response = await songbook.mutate({ action: folder ? 'renameFolder' : 'createFolder', id: folder?.id || pendingFolderCreation.id, revision: folder?.revision, name });
+      if (!isCurrent()) return;
+      folders = [...folders.filter(item => item.id !== response.folder.id), response.folder];
+      if (!folder) { pendingFolderCreation = null; persistState(); }
+      renderLibrary();
+      setSongMessage(folder ? 'Carpeta renombrada.' : 'Carpeta creada.');
+    });
+  }
+
+  async function handleFolderClick(event) {
+    if (saving) return;
+    const button = event.target.closest('[data-folder-action]');
+    const folder = folders.find(item => item.id === button?.dataset.folderId);
+    if (!folder) return;
+    if (button.dataset.folderAction === 'open') { activeFolderId = folder.id; renderLibrary(); }
+    if (button.dataset.folderAction === 'rename') await editFolder(folder);
+    if (button.dataset.folderAction === 'delete') {
+      const confirmed = await requestConfirm({ title: 'Eliminar carpeta', copy: `Se elimina "${folder.name}" para todos. Sus canciones se moverán a Canciones sin carpeta.`, confirmText: 'Eliminar carpeta' });
+      if (!confirmed) return;
+      await mutateLibrary(async (isCurrent) => {
+        const previousRevision = getCurrentSong()?.revision;
+        await songbook.mutate({ action: 'deleteFolder', id: folder.id, revision: folder.revision, confirmed: true });
+        const response = await songbook.list();
+        if (!isCurrent()) return;
+        folders = response.folders;
+        library = { songs: response.songs };
+        if (songFolderId === folder.id) {
+          songFolderId = null;
+          const latest = getCurrentSong();
+          if (previousRevision === currentRevision && latest?.revision === previousRevision + 1 && serializeSongDraft(latest) === savedSnapshot) currentRevision = latest.revision;
+        }
+        persistState();
+        renderLibrary();
+        setSongMessage('Carpeta eliminada. Sus canciones están en la raíz.');
+      });
+    }
   }
 
   function handleBlockListClick(event) {
@@ -629,13 +826,15 @@ export function initMetronome(root = document.querySelector('#metronome-tool'), 
   }
 
   function handleBlockListInput(event) {
-    const input = event.target.closest('[data-block-measures], [data-block-bpm]');
+    if (saving) return;
+    const input = event.target.closest('[data-block-measures], [data-block-bpm], [data-ramp-enabled], [data-ramp-bpm], [data-ramp-measures]');
     if (!input) {
       return;
     }
     syncBlocksFromDom();
     clearConfigError();
     renderEditor();
+    persistState();
   }
 
   function handleBlockListKeydown(event) {
@@ -689,6 +888,7 @@ export function initMetronome(root = document.querySelector('#metronome-tool'), 
     clearConfigError();
     renderEditableBlocks();
     renderEditor();
+    persistState();
     return true;
   }
 
@@ -714,8 +914,13 @@ export function initMetronome(root = document.querySelector('#metronome-tool'), 
       return {
         id: row.dataset.blockId || blocks[index]?.id || createId('part'),
         name: nameInput ? nameInput.value : blocks[index]?.name || row.querySelector('[data-part-name-button]')?.textContent || `Parte ${index + 1}`,
-        measures: row.querySelector('[data-block-measures]')?.value || blocks[index]?.measures || '4',
-        bpm: row.querySelector('[data-block-bpm]')?.value || blocks[index]?.bpm || String(currentBpm()),
+        measures: row.querySelector('[data-block-measures]')?.value ?? blocks[index]?.measures ?? '4',
+        bpm: row.querySelector('[data-block-bpm]')?.value ?? blocks[index]?.bpm ?? String(currentBpm()),
+        ramp: row.querySelector('[data-ramp-enabled]') ? {
+          enabled: row.querySelector('[data-ramp-enabled]').checked,
+          targetBpm: row.querySelector('[data-ramp-bpm]').value,
+          measures: row.querySelector('[data-ramp-measures]').value
+        } : blocks[index]?.ramp,
         order: index
       };
     });
@@ -744,7 +949,7 @@ export function initMetronome(root = document.querySelector('#metronome-tool'), 
     dom.partNow.textContent = currentBlock.name;
     dom.nextPart.textContent = isInitialCountIn ? currentBlock.name : nextBlock.name;
     dom.incomingBpm.textContent = String(isInitialCountIn ? currentBlock.bpm : nextBlock.bpm);
-    dom.bpmNow.textContent = String(currentBlock.bpm);
+    dom.bpmNow.textContent = String(Math.round(getPlaybackBpm(runtime, currentBlocks) * 10) / 10);
     dom.block.textContent = `${runtime.blockIndex + 1}/${currentBlocks.length}`;
 
     if (runtime.phase === 'countIn') {
@@ -775,7 +980,7 @@ export function initMetronome(root = document.querySelector('#metronome-tool'), 
     const rows = blocks.map((block, index) => createPartCard(block, index));
     dom.blockList.replaceChildren(...rows);
     dom.partCount.textContent = `${blocks.length} de ${MAX_PARTS} partes`;
-    dom.addBlock.disabled = blocks.length >= MAX_PARTS;
+    dom.addBlock.disabled = saving || blocks.length >= MAX_PARTS;
   }
 
   function createPartCard(block, index) {
@@ -828,6 +1033,21 @@ export function initMetronome(root = document.querySelector('#metronome-tool'), 
       createIconButton('Bajar', 'down', index === blocks.length - 1),
       createIconButton('Eliminar', 'remove', blocks.length === 1)
     );
+    const ramp = document.createElement('div');
+    ramp.className = 'part-ramp';
+    const label = document.createElement('label');
+    const enabled = document.createElement('input');
+    enabled.type = 'checkbox';
+    enabled.dataset.rampEnabled = '';
+    enabled.checked = block.ramp?.enabled === true;
+    label.append(enabled, document.createTextNode(' Aceleración progresiva'));
+    ramp.append(label,
+      createPartField('BPM objetivo', 'data-ramp-bpm', block.ramp?.targetBpm ?? block.bpm),
+      createPartField('Compases de transición', 'data-ramp-measures', block.ramp?.measures ?? 1));
+    const help = document.createElement('small');
+    help.textContent = 'Desde el BPM de esta parte. Al terminar, mantiene el objetivo hasta la próxima parte.';
+    ramp.append(help);
+    row.append(ramp);
     return row;
   }
 
@@ -868,9 +1088,38 @@ export function initMetronome(root = document.querySelector('#metronome-tool'), 
   }
 
   function renderLibrary() {
-    const songs = [...library.songs].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+    const songs = library.songs.filter(song => (song.folderId || null) === activeFolderId).sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+    const folder = folders.find(item => item.id === activeFolderId);
+    dom.folderBack.hidden = !activeFolderId;
+    dom.folderTitle.textContent = folder?.name || 'Canciones sin carpeta';
+    dom.folderList.hidden = !!activeFolderId;
+    dom.folderList.replaceChildren(...folders.slice().sort((a, b) => a.name.localeCompare(b.name, 'es-AR')).map(createFolderCard));
+    dom.libraryCopy.textContent = authenticated ? 'Canciones y carpetas compartidas entre usuarios autenticados.' : 'Canciones locales originales. El cancionero compartido requiere sesión online.';
     dom.songEmpty.hidden = songs.length > 0;
     dom.songList.replaceChildren(...songs.map(createSongCard));
+  }
+
+  function createFolderCard(folder) {
+    const card = document.createElement('article');
+    card.className = 'song-card folder-card';
+    const title = document.createElement('strong');
+    title.textContent = `📁 ${folder.name}`;
+    const count = document.createElement('span');
+    count.textContent = `${library.songs.filter(song => song.folderId === folder.id).length} canciones`;
+    const actions = document.createElement('div');
+    actions.className = 'song-actions';
+    for (const [label, action] of [['Abrir', 'open'], ['Renombrar', 'rename'], ['Eliminar', 'delete']]) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = action === 'delete' ? 'danger-button' : 'quiet-button';
+      button.textContent = label;
+      button.dataset.folderAction = action;
+      button.dataset.folderId = folder.id;
+      button.disabled = saving || !ready;
+      actions.append(button);
+    }
+    card.append(title, count, actions);
+    return card;
   }
 
   function createSongCard(song) {
@@ -900,6 +1149,25 @@ export function initMetronome(root = document.querySelector('#metronome-tool'), 
       createSongButton('Renombrar', 'rename', song.id, 'quiet-button'),
       createSongButton('Eliminar', 'delete', song.id, 'danger-button')
     );
+    if (authenticated) {
+      const label = document.createElement('label');
+      label.className = 'compact-field song-folder';
+      const text = document.createElement('span');
+      text.textContent = 'Mover a';
+      const select = document.createElement('select');
+      select.dataset.songFolder = '';
+      select.setAttribute('aria-label', `Carpeta de ${song.name}`);
+      for (const folder of [{ id: '', name: 'Canciones sin carpeta' }, ...folders]) {
+        const option = document.createElement('option');
+        option.value = folder.id;
+        option.textContent = folder.name;
+        select.append(option);
+      }
+      select.value = song.folderId || '';
+      select.disabled = saving || !ready;
+      label.append(text, select);
+      actions.append(label, createSongButton('Mover', 'move', song.id, 'quiet-button'));
+    }
 
     card.append(head, actions);
     return card;
@@ -912,6 +1180,7 @@ export function initMetronome(root = document.querySelector('#metronome-tool'), 
     button.dataset.songAction = action;
     button.dataset.songId = songId;
     button.textContent = label;
+    button.disabled = saving || (action !== 'open' && (!authenticated || !ready));
     return button;
   }
 
@@ -1047,24 +1316,51 @@ export function initMetronome(root = document.querySelector('#metronome-tool'), 
     root.dataset.playbackState = playbackState;
     dom.transportState.textContent =
       playbackState === 'playing' ? 'En marcha' : playbackState === 'paused' ? 'En pausa' : 'Detenido';
-    dom.start.disabled = running;
-    dom.pause.disabled = !running;
+    dom.start.disabled = running || startingAudio;
+    dom.pause.disabled = !running || startingAudio;
     dom.pause.textContent = paused ? 'Reanudar' : 'Pausar';
-    dom.stop.disabled = !running;
+    dom.stop.disabled = !running && !startingAudio;
     if (dom.restart) {
       dom.restart.disabled = false;
     }
-    dom.saveSong.disabled = saving;
-    dom.saveSongAs.disabled = saving;
-    dom.save.disabled = saving;
-    dom.saveBlocksAs.disabled = saving;
-    dom.addBlock.disabled = blocks.length >= MAX_PARTS;
+    dom.saveSong.disabled = saving || !authenticated || !ready;
+    dom.saveSongAs.disabled = saving || !authenticated || !ready;
+    dom.save.disabled = saving || !authenticated || !ready;
+    dom.saveBlocksAs.disabled = saving || !authenticated || !ready;
+    dom.newFolder.disabled = saving || !authenticated || !ready;
+    dom.refresh.disabled = saving || refreshing || !authenticated;
+    dom.newSong.disabled = saving;
+    dom.configure.disabled = saving;
+    dom.cancel.disabled = saving;
+    dom.songName.disabled = saving;
+    dom.bpm.disabled = saving;
+    dom.tap.disabled = saving;
+    dom.restore.disabled = saving;
+    for (const input of dom.blockList.querySelectorAll('input,button')) input.disabled = saving;
+    for (const row of dom.blockList.querySelectorAll('[data-metronome-block-row]')) {
+      const index = Number(row.dataset.blockIndex);
+      row.querySelector('[data-block-action="up"]').disabled = saving || index === 0;
+      row.querySelector('[data-block-action="down"]').disabled = saving || index === blocks.length - 1;
+      row.querySelector('[data-block-action="remove"]').disabled = saving || blocks.length === 1;
+    }
+    for (const button of root.querySelectorAll('[data-song-action],[data-folder-action],[data-song-folder]')) button.disabled = saving || (button.dataset.songAction !== 'open' && (!authenticated || !ready));
+    dom.addBlock.disabled = saving || blocks.length >= MAX_PARTS;
     dom.saveSong.textContent = saving ? 'Guardando...' : 'Guardar canción';
     dom.save.textContent = saving ? 'Guardando...' : 'Guardar canción';
   }
 
   function playbackBlocks() {
-    return blocks.length ? normalizeBlocks(blocks) : cloneBlocks(DEFAULT_BLOCKS);
+    const valid = validateEditableBlocks(blocks);
+    return valid.ok ? valid.blocks : cloneBlocks(DEFAULT_BLOCKS);
+  }
+
+  function validatePlaybackDraft() {
+    if (!dom.dialog.hidden) syncBlocksFromDom();
+    if (!blocks.length) return true;
+    const validation = validateEditableBlocks(blocks);
+    if (validation.ok) return true;
+    setConfigError(validation.message);
+    return false;
   }
 
   function isDirty() {
@@ -1099,7 +1395,7 @@ export function initMetronome(root = document.querySelector('#metronome-tool'), 
   }
 
   function persistState() {
-    getStorage()?.setItem(
+    try { getStorage()?.setItem(
       scopedStorageKey(STORAGE_KEY),
       JSON.stringify({
         assetVersion: ASSET_VERSION,
@@ -1107,15 +1403,18 @@ export function initMetronome(root = document.querySelector('#metronome-tool'), 
         volume: Number(dom.volume.value),
         blocks,
         currentSongId,
+        currentRevision,
+        songFolderId,
+        savedSnapshot,
+        pendingCreate,
+        pendingFolderCreation,
+        songName,
+        sharedSong: authenticated && currentRevision !== null,
         announceParts: dom.announceParts.checked,
         voiceURI: dom.voiceSelect.value,
         voiceVolume: Number(dom.voiceVolume.value)
       })
-    );
-  }
-
-  function persistLibrary() {
-    getStorage()?.setItem(scopedStorageKey(SONGS_STORAGE_KEY), JSON.stringify(library));
+    ); } catch { setSongMessage('No se pudieron guardar las preferencias en este dispositivo. El cancionero compartido conserva los guardados confirmados por el servidor.'); }
   }
 
   function focusPartNameInput(index) {
@@ -1163,6 +1462,9 @@ export function initMetronome(root = document.querySelector('#metronome-tool'), 
 
   return {
     stop,
+    setSession,
+    refresh: refreshLibrary,
+    destroy: () => { stop({ silent: true }); getBrowserWindow().clearInterval(refreshTimer); },
     getState: () => ({
       blocks: cloneBlocks(blocks),
       runtime: { ...runtime },
@@ -1176,7 +1478,7 @@ export function initMetronome(root = document.querySelector('#metronome-tool'), 
   };
 }
 
-class MetronomeAudio {
+export class MetronomeAudio {
   constructor({ speech, getSpeechSettings, onBeat, onCountIn, onStatus }) {
     this.speech = speech;
     this.getSpeechSettings = getSpeechSettings;
@@ -1193,6 +1495,10 @@ class MetronomeAudio {
     this.sequence = 0;
     this.scheduledNodes = new Set();
     this.scheduledCallbacks = new Set();
+    this.pendingBeats = new Map();
+    this.startPromise = null;
+    this.resumeRuntime = null;
+    this.pauseDelay = 0.05;
   }
 
   setVolume(value) {
@@ -1203,12 +1509,15 @@ class MetronomeAudio {
   }
 
   async start({ runtime, blocks }) {
-    if (this.timer) {
+    if (this.timer || this.startPromise) {
       return false;
     }
 
+    const sequence = ++this.sequence;
     this.runtime = { ...runtime };
     this.blocks = normalizeBlocks(blocks);
+    this.resumeRuntime = null;
+    this.pauseDelay = 0.05;
     const browserWindow = getBrowserWindow();
     const AudioContextClass = browserWindow.AudioContext || browserWindow.webkitAudioContext;
     if (!AudioContextClass) {
@@ -1216,43 +1525,87 @@ class MetronomeAudio {
       return false;
     }
 
-    if (!this.context) {
-      this.context = new AudioContextClass();
-      this.gain = this.context.createGain();
-      this.gain.gain.value = this.volume;
-      this.gain.connect(this.context.destination);
-    }
-
     try {
-      const resumeResult = this.context.resume?.();
-      resumeResult?.catch?.(() => this.onStatus('No se pudo reanudar el audio.'));
+      if (!this.context) {
+        this.context = new AudioContextClass();
+        this.gain = this.context.createGain();
+        this.gain.gain.value = this.volume;
+        this.gain.connect(this.context.destination);
+      }
     } catch {
-      this.onStatus('No se pudo iniciar el audio.');
+      this.context = null;
+      this.gain = null;
+      this.onStatus('No se pudo abrir el audio. Tocá Iniciar para volver a intentar.');
       return false;
     }
 
-    this.sequence += 1;
-    this.beginPhase(this.sequence);
-    return true;
+    const attempt = (async () => {
+      try {
+        await this.context.resume?.();
+      } catch {
+        if (sequence === this.sequence) {
+          this.onStatus('No se pudo iniciar el audio. Tocá Iniciar para volver a intentar.');
+        }
+        return false;
+      }
+      if (sequence !== this.sequence) {
+        return false;
+      }
+      this.beginPhase(sequence);
+      return Boolean(this.timer);
+    })();
+    this.startPromise = attempt;
+    try {
+      return await attempt;
+    } finally {
+      if (this.startPromise === attempt) {
+        this.startPromise = null;
+      }
+    }
   }
 
   pause() {
+    const now = this.context?.currentTime || 0;
+    const nextPending = [...this.pendingBeats.values()].find((beat) => beat.time > now);
+    this.resumeRuntime = { ...(nextPending?.runtime || this.runtime) };
+    this.pauseDelay = Math.max(0, (nextPending?.time ?? this.nextNoteTime) - now);
     this.sequence += 1;
+    this.startPromise = null;
     this.clearTimers();
     this.speech.cancel();
     this.stopScheduledClicks();
   }
 
-  resume({ runtime, blocks }) {
-    if (this.timer || !this.context) {
+  async resume({ runtime, blocks }) {
+    if (this.timer || this.startPromise || !this.context) {
       return false;
     }
-    this.runtime = { ...runtime };
+    this.runtime = { ...(this.resumeRuntime || runtime) };
     this.blocks = normalizeBlocks(blocks);
-    this.context.resume?.();
-    this.sequence += 1;
-    this.beginPhase(this.sequence);
-    return true;
+    const sequence = ++this.sequence;
+    const attempt = (async () => {
+      try {
+        await this.context.resume?.();
+      } catch {
+        if (sequence === this.sequence) {
+          this.onStatus('No se pudo reanudar el audio.');
+        }
+        return false;
+      }
+      if (sequence !== this.sequence) {
+        return false;
+      }
+      this.beginPhase(sequence, this.pauseDelay);
+      return Boolean(this.timer);
+    })();
+    this.startPromise = attempt;
+    try {
+      return await attempt;
+    } finally {
+      if (this.startPromise === attempt) {
+        this.startPromise = null;
+      }
+    }
   }
 
   stop() {
@@ -1260,6 +1613,7 @@ class MetronomeAudio {
     this.pause();
     this.nextNoteTime = 0;
     this.runtime = null;
+    this.resumeRuntime = null;
   }
 
   async restart({ runtime, blocks }) {
@@ -1267,13 +1621,13 @@ class MetronomeAudio {
     return this.start({ runtime, blocks });
   }
 
-  beginPhase(sequence) {
+  beginPhase(sequence, delay = 0.05) {
     if (!this.context || !this.runtime || sequence !== this.sequence) {
       return;
     }
 
     this.clearTimers();
-    this.nextNoteTime = this.context.currentTime + 0.05;
+    this.nextNoteTime = this.context.currentTime + delay;
     this.startScheduler(sequence);
   }
 
@@ -1293,8 +1647,15 @@ class MetronomeAudio {
     }
 
     const browserWindow = getBrowserWindow();
+    // After a suspended/background tab, skip expired pulses instead of
+    // scheduling a burst of clicks in the past.
+    while (this.timer && this.nextNoteTime < this.context.currentTime) {
+      this.nextNoteTime += getPlaybackInterval(this.runtime, this.blocks);
+      this.runtime = advancePlaybackRuntime(this.runtime, this.blocks);
+    }
     while (this.timer && this.nextNoteTime < this.context.currentTime + SCHEDULE_AHEAD_SECONDS) {
       const scheduledRuntime = { ...this.runtime };
+      scheduledRuntime.bpm = getPlaybackBpm(scheduledRuntime, this.blocks);
       const scheduledTime = this.nextNoteTime;
       const callbackDelay = Math.max(0, (scheduledTime - this.context.currentTime) * 1000);
       const accented = scheduledRuntime.phase === 'playing' && scheduledRuntime.beatInMeasure === 1;
@@ -1302,7 +1663,11 @@ class MetronomeAudio {
 
       const callbackId = browserWindow.setTimeout(() => {
         this.scheduledCallbacks.delete(callbackId);
+        this.pendingBeats.delete(callbackId);
         if (sequence !== this.sequence) {
+          return;
+        }
+        if (scheduledTime + getPlaybackInterval(scheduledRuntime, this.blocks) <= this.context.currentTime) {
           return;
         }
         const announcementWord = getAnnouncementWord(scheduledRuntime, this.blocks);
@@ -1314,9 +1679,10 @@ class MetronomeAudio {
         this.speakScheduledWord(announcementWord);
       }, callbackDelay);
       this.scheduledCallbacks.add(callbackId);
+      this.pendingBeats.set(callbackId, { runtime: scheduledRuntime, time: scheduledTime });
 
       this.runtime = advancePlaybackRuntime(this.runtime, this.blocks);
-      this.nextNoteTime += 60 / scheduledRuntime.bpm;
+      this.nextNoteTime += getPlaybackInterval(scheduledRuntime, this.blocks);
     }
   }
 
@@ -1366,6 +1732,7 @@ class MetronomeAudio {
       browserWindow.clearTimeout(callbackId);
     }
     this.scheduledCallbacks.clear();
+    this.pendingBeats.clear();
   }
 
   stopScheduledClicks() {
@@ -1503,6 +1870,12 @@ function collectDom(root) {
     songList: root.querySelector('#metronome-song-list'),
     songEmpty: root.querySelector('#metronome-song-empty'),
     songMessage: root.querySelector('#metronome-song-message'),
+    refresh: root.querySelector('#metronome-refresh'),
+    newFolder: root.querySelector('#metronome-new-folder'),
+    folderBack: root.querySelector('#metronome-folder-back'),
+    folderTitle: root.querySelector('#metronome-folder-title'),
+    folderList: root.querySelector('#metronome-folder-list'),
+    libraryCopy: root.querySelector('#metronome-library-copy'),
     dialog: document.querySelector('#metronome-config-dialog'),
     songName: document.querySelector('#metronome-song-name'),
     partCount: document.querySelector('#metronome-part-count'),
@@ -1545,8 +1918,15 @@ function readState() {
       voiceVolume,
       announceParts: parsed?.announceParts !== false,
       voiceURI: typeof parsed?.voiceURI === 'string' ? parsed.voiceURI : '',
-      blocks: normalizeBlocks(parsed?.blocks),
-      currentSongId: typeof parsed?.currentSongId === 'string' ? parsed.currentSongId : null
+      blocks: Array.isArray(parsed?.blocks) && parsed.blocks.length <= MAX_PARTS ? cloneBlocks(parsed.blocks) : cloneBlocks(DEFAULT_BLOCKS),
+      songName: typeof parsed?.songName === 'string' ? parsed.songName : '',
+      savedSnapshot: typeof parsed?.savedSnapshot === 'string' ? parsed.savedSnapshot : null,
+      currentRevision: Number.isSafeInteger(parsed?.currentRevision) ? parsed.currentRevision : null,
+      pendingCreate: typeof parsed?.pendingCreate?.id === 'string' && typeof parsed?.pendingCreate?.snapshot === 'string' ? parsed.pendingCreate : null,
+      pendingFolderCreation: typeof parsed?.pendingFolderCreation?.id === 'string' && typeof parsed?.pendingFolderCreation?.name === 'string' ? parsed.pendingFolderCreation : null,
+      songFolderId: typeof parsed?.songFolderId === 'string' ? parsed.songFolderId : null,
+      currentSongId: typeof parsed?.currentSongId === 'string' ? parsed.currentSongId : null,
+      sharedSong: parsed?.sharedSong === true
     };
   } catch {
     return {
@@ -1556,6 +1936,12 @@ function readState() {
       announceParts: true,
       voiceURI: '',
       blocks: cloneBlocks(DEFAULT_BLOCKS),
+      songName: '',
+      savedSnapshot: null,
+      currentRevision: null,
+      pendingCreate: null,
+      pendingFolderCreation: null,
+      songFolderId: null,
       currentSongId: null
     };
   }
@@ -1592,7 +1978,7 @@ function readLibrary() {
 }
 
 function cloneBlocks(blocks) {
-  return normalizeBlocks(blocks, { fallbackToDefault: false })?.map((block, index) => ({ ...block, order: index })) || [];
+  return Array.isArray(blocks) ? blocks.map((block, index) => ({ ...block, ...(block.ramp ? { ramp: { ...block.ramp } } : {}), order: index })) : [];
 }
 
 function cloneSongs(songs) {
@@ -1600,6 +1986,10 @@ function cloneSongs(songs) {
     ...song,
     blocks: cloneBlocks(song.blocks)
   }));
+}
+
+function findSong(library, songId) {
+  return library.songs.find(song => song.id === songId) || null;
 }
 
 function formatLocalDateTime(value) {

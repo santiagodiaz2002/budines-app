@@ -58,6 +58,6 @@ it('actualizar el shell elimina versiones anteriores y conserva caches ajenos', 
   let activation;
   handlers.activate({ waitUntil: promise => { activation = promise; } });
   await activation;
-  expect(deleted).toEqual(['budines-shell-v36-offline-chat']);
+  expect(deleted).toEqual(['budines-shell-v36-offline-chat', 'budines-shell-v37-tools-only']);
   expect(claimed).toBe(true);
 });

@@ -15,7 +15,7 @@
     <link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
     <link rel="icon" href="/icons/favicon-16.png" sizes="16x16" type="image/png">
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
-    <link rel="stylesheet" href="/styles.css?v=tools-only-20261012">
+    <link rel="stylesheet" href="/styles.css?v=songbook-20261012">
   </head>
   <body data-auth-state="booting">
     <a class="skip-link" href="#main-content">Saltar al contenido</a>
@@ -311,11 +311,20 @@
             <div class="panel-heading row-heading">
               <div>
                 <p class="eyebrow">Biblioteca</p>
-                <h2 id="metronome-library-title">Mis canciones</h2>
-                <p class="heading-copy">Tus canciones quedan en este dispositivo.</p>
+                <h2 id="metronome-library-title">Cancionero</h2>
+                <p id="metronome-library-copy" class="heading-copy">Canciones y carpetas compartidas entre usuarios autenticados.</p>
               </div>
-              <button id="metronome-new-song" class="quiet-button" type="button">Nueva canción</button>
+              <div class="heading-actions">
+                <button id="metronome-refresh" class="quiet-button" type="button">Actualizar</button>
+                <button id="metronome-new-folder" class="quiet-button" type="button">Nueva carpeta</button>
+                <button id="metronome-new-song" class="quiet-button" type="button">Nueva canción</button>
+              </div>
             </div>
+            <div class="songbook-navigation">
+              <button id="metronome-folder-back" class="quiet-button" type="button" hidden>← Cancionero</button>
+              <strong id="metronome-folder-title">Canciones sin carpeta</strong>
+            </div>
+            <div id="metronome-folder-list" class="song-list"></div>
             <p id="metronome-song-message" class="tool-status" role="status"></p>
             <p id="metronome-song-empty" class="input-preview">Todavía no hay canciones guardadas.</p>
             <div id="metronome-song-list" class="song-list"></div>
@@ -409,7 +418,7 @@
     <div id="metronome-config-dialog" class="dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="metronome-config-title" hidden>
       <div class="dialog-panel dialog-panel--wide">
         <h2 id="metronome-config-title">Configurar canción</h2>
-        <p class="dialog-copy">Editá el nombre de la canción y sus partes. Antes de cada parte puede sonar el anuncio y la cuenta previa.</p>
+        <p class="dialog-copy">Editá la canción y sus partes en 4/4. La cuenta inicial tiene cuatro pulsos; la última vuelta de cada parte anuncia la siguiente. La aceleración comienza al entrar en la parte.</p>
         <label class="field">
           <span>Nombre de la canción</span>
           <input id="metronome-song-name" type="text" maxlength="80" autocomplete="off">
@@ -452,7 +461,7 @@
         <form id="metronome-name-form" class="stack" novalidate>
           <label class="field">
             <span>Nombre</span>
-            <input id="metronome-name-input" type="text" maxlength="60" autocomplete="off" required>
+            <input id="metronome-name-input" type="text" maxlength="80" autocomplete="off" required>
           </label>
           <p id="metronome-name-error" class="form-message" role="status"></p>
           <div class="dialog-actions">
@@ -475,6 +484,6 @@
     </div>
 
     <p id="live-region" class="sr-only" aria-live="polite" aria-atomic="true"></p>
-    <script type="module" src="/js/app.js?v=tools-only-20261012"></script>
+    <script type="module" src="/js/app.js?v=songbook-20261012"></script>
   </body>
 </html>

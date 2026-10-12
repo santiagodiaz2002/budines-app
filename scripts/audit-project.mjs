@@ -10,6 +10,7 @@ const requiredFiles = [
   'AGENTS.md',
   'database/schema.sql',
   'migrations/0011_retire_accounting.sql',
+  'migrations/0012_shared_songbook.sql',
   'public/index.html',
   'public/styles.css',
   'public/manifest.webmanifest',
@@ -25,6 +26,7 @@ const requiredFiles = [
   'functions/api/owner-summary.js',
   'functions/api/records/[id]/void.js',
   'functions/api/chat.js',
+  'functions/api/songbook.js',
   'functions/api/health.js',
   'scripts/seed-owners.mjs'
 ];
@@ -43,11 +45,11 @@ if (!gitignore.includes('.dev.vars')) {
 }
 
 const schema = readIfExists('database/schema.sql');
-const allowedTables = new Set(['app_users', 'app_sessions', 'auth_rate_limits', 'chat_messages']);
+const allowedTables = new Set(['app_users', 'app_sessions', 'auth_rate_limits', 'chat_messages', 'songbook_songs', 'songbook_folders', 'songbook_imports']);
 const bootstrapTables = [...schema.matchAll(/CREATE TABLE(?: IF NOT EXISTS)?\s+(\w+)/gi)]
   .map((match) => match[1]);
 if (bootstrapTables.length !== allowedTables.size || bootstrapTables.some((table) => !allowedTables.has(table))) {
-  failures.push('el esquema inicial debe contener solo cuentas, sesiones, límites de autenticación y chat');
+  failures.push('el esquema inicial debe contener solo cuentas, sesiones, límites de autenticación, chat y cancionero');
 }
 for (const retiredModule of ['d1-repository.js', 'records-service.js', 'summary.js']) {
   if (existsSync(join('functions/_shared', retiredModule))) {
@@ -61,10 +63,12 @@ const localStorageAllowed = new Set([
   'public\\js\\metronome.js',
   'public\\js\\metronome-editor.js',
   'public\\js\\local-storage.js',
+  'public\\js\\songbook-client.js',
   'public/js/truco.js',
   'public/js/metronome.js',
   'public/js/metronome-editor.js',
-  'public/js/local-storage.js'
+  'public/js/local-storage.js',
+  'public/js/songbook-client.js'
 ]);
 for (const file of frontendFiles) {
   const content = readFileSync(file, 'utf8');

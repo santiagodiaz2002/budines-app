@@ -43,6 +43,27 @@ export function parseMeasures(raw) {
   return parseStrictInteger(raw, { min: MIN_MEASURES, max: MAX_MEASURES, label: 'Compases' });
 }
 
+export function validateTempoRamp(value, { bpm, measures }) {
+  if (value === undefined || value === null) {
+    return { ok: true };
+  }
+  if (typeof value !== 'object' || Array.isArray(value) || typeof value.enabled !== 'boolean') {
+    return { ok: false, message: 'Configuración de aceleración inválida.', field: 'rampEnabled' };
+  }
+  const target = parseBpm(String(value.targetBpm ?? ''));
+  if (!target.ok) {
+    return { ok: false, message: `BPM objetivo: ${target.message}`, field: 'rampTarget' };
+  }
+  const duration = parseMeasures(String(value.measures ?? ''));
+  if (!duration.ok || duration.value > measures) {
+    return { ok: false, message: 'La aceleración debe durar entre 1 y la cantidad de compases de la parte.', field: 'rampMeasures' };
+  }
+  if (value.enabled && target.value <= bpm) {
+    return { ok: false, message: 'El BPM objetivo debe superar al BPM inicial.', field: 'rampTarget' };
+  }
+  return { ok: true, ramp: { enabled: value.enabled, targetBpm: target.value, measures: duration.value } };
+}
+
 export function parsePartName(raw) {
   if (typeof raw !== 'string') {
     return { ok: false, message: 'Nombre de la parte es obligatorio.' };
@@ -125,11 +146,17 @@ export function validateEditableBlocks(rows, { idFactory = DEFAULT_ID_FACTORY } 
       return { ok: false, message: bpm.message, field: 'bpm', index };
     }
 
+    const ramp = validateTempoRamp(row.ramp, { bpm: bpm.value, measures: measures.value });
+    if (!ramp.ok) {
+      return { ...ramp, index };
+    }
+
     blocks.push({
       id: stableId(row.id, () => idFactory('part')),
       name: name.value,
       measures: measures.value,
       bpm: bpm.value,
+      ...(ramp.ramp ? { ramp: ramp.ramp } : {}),
       order: index
     });
   }
@@ -296,25 +323,55 @@ export function hasUnsavedBlockChanges(blocks, savedBlocks) {
 
 export function serializeSongDraft({ name, blocks }) {
   return JSON.stringify({
-    name: typeof name === 'string' ? name.trim() : '',
-    blocks: normalizeBlocks(blocks, { fallbackToDefault: false })?.map((block, index) => ({
-      name: block.name,
-      measures: block.measures,
-      bpm: block.bpm,
-      order: index
-    })) || []
+    name: typeof name === 'string' ? name.trim() : name ?? '',
+    blocks: canonicalDraftBlocks(blocks)
   });
 }
 
 export function serializeBlocks(blocks) {
-  return JSON.stringify(
-    normalizeBlocks(blocks).map((block, index) => ({
-      name: block.name,
-      measures: block.measures,
-      bpm: block.bpm,
+  return JSON.stringify(canonicalDraftBlocks(blocks));
+}
+
+// A draft can contain unfinished text inputs. Keep that text so changing or
+// clearing an invalid field still counts as an edit; playback normalization
+// must never turn an unsaved draft into defaults or an empty song snapshot.
+function canonicalDraftBlocks(blocks) {
+  if (!Array.isArray(blocks)) {
+    return blocks ?? [];
+  }
+  return blocks.map((block, index) => {
+    if (!block || typeof block !== 'object' || Array.isArray(block)) {
+      return block ?? null;
+    }
+    const { id, order, name, measures, bpm, ramp, ...extraContent } = block;
+    const result = {
+      name: typeof block.name === 'string' ? block.name.trim() : block.name,
+      measures: canonicalDraftInteger(block.measures, parseMeasures),
+      bpm: canonicalDraftInteger(block.bpm, parseBpm),
+      ...(block.ramp !== undefined ? { ramp: block.ramp } : {}),
+      ...sortDraftFields(extraContent),
       order: index
-    }))
-  );
+    };
+    if (block.ramp && typeof block.ramp === 'object' && !Array.isArray(block.ramp)) {
+      const { enabled, targetBpm, measures: rampMeasures, ...extraRamp } = block.ramp;
+      result.ramp = {
+        enabled,
+        targetBpm: canonicalDraftInteger(block.ramp.targetBpm, parseBpm),
+        measures: canonicalDraftInteger(block.ramp.measures, parseMeasures),
+        ...sortDraftFields(extraRamp)
+      };
+    }
+    return result;
+  });
+}
+
+function sortDraftFields(fields) {
+  return Object.fromEntries(Object.entries(fields).sort(([left], [right]) => left.localeCompare(right)));
+}
+
+function canonicalDraftInteger(value, parse) {
+  const parsed = parse(typeof value === 'number' ? String(value) : value);
+  return parsed.ok ? parsed.value : value;
 }
 
 export function moveBlock(blocks, fromIndex, toIndex) {
@@ -377,12 +434,55 @@ export function createPlaybackRuntime(blocks) {
   return createCountInRuntime(0, blocks);
 }
 
+// Tempo is linear in musical phase (quarter-note beats), not in wall-clock
+// time. Integrating dt/dx = 60 / BPM(x) places every audio pulse exactly.
+export function getTempoTimeAtBeat(block, beat) {
+  const position = Math.max(0, beat);
+  if (!block.ramp?.enabled) {
+    return 60 * position / block.bpm;
+  }
+  const duration = block.ramp.measures * BEATS_PER_MEASURE;
+  const difference = block.ramp.targetBpm - block.bpm;
+  if (difference === 0) {
+    return 60 * position / block.bpm;
+  }
+  const rampPosition = Math.min(position, duration);
+  const rampTime = 60 * duration / difference * Math.log1p(difference * rampPosition / (duration * block.bpm));
+  return rampTime + 60 * Math.max(0, position - duration) / block.ramp.targetBpm;
+}
+
+export function getPlaybackBpm(runtime, blocks) {
+  const block = getCurrentBlock(runtime, blocks);
+  if (runtime.phase === 'countIn' || !block.ramp?.enabled) {
+    return block.bpm;
+  }
+  if (runtime.rampComplete && blocks.length === 1) {
+    return block.ramp.targetBpm;
+  }
+  const position = (runtime.measureInBlock - 1) * BEATS_PER_MEASURE + runtime.beatInMeasure - 1;
+  const duration = block.ramp.measures * BEATS_PER_MEASURE;
+  return block.bpm + (block.ramp.targetBpm - block.bpm) * Math.min(1, position / duration);
+}
+
+export function getPlaybackInterval(runtime, blocks) {
+  const block = getCurrentBlock(runtime, blocks);
+  if (runtime.phase === 'countIn') {
+    return 60 / block.bpm;
+  }
+  if (runtime.rampComplete && blocks.length === 1 && block.ramp?.enabled) {
+    return 60 / block.ramp.targetBpm;
+  }
+  const position = (runtime.measureInBlock - 1) * BEATS_PER_MEASURE + runtime.beatInMeasure - 1;
+  return getTempoTimeAtBeat(block, position + 1) - getTempoTimeAtBeat(block, position);
+}
+
 export function advanceRuntime(runtime, blocks) {
   const normalized = normalizeBlocks(blocks);
   const currentBlock = normalized[runtime.blockIndex] || normalized[0];
   let blockIndex = runtime.blockIndex;
   let measureInBlock = runtime.measureInBlock;
   let beatInMeasure = runtime.beatInMeasure + 1;
+  let rampComplete = runtime.rampComplete === true;
 
   if (beatInMeasure > BEATS_PER_MEASURE) {
     beatInMeasure = 1;
@@ -391,17 +491,23 @@ export function advanceRuntime(runtime, blocks) {
     if (measureInBlock > currentBlock.measures) {
       blockIndex = (blockIndex + 1) % normalized.length;
       measureInBlock = 1;
+      // Repeating the only part does not introduce a new tempo setting. Keep
+      // its reached target until Stop/restart or another configuration action.
+      rampComplete = normalized.length === 1 && currentBlock.ramp?.enabled === true;
     }
   }
 
-  return {
+  const next = {
     blockIndex,
     measureInBlock,
     beatInMeasure,
     bpm: normalized[blockIndex].bpm,
     phase: 'playing',
-    countInBeat: null
+    countInBeat: null,
+    ...(rampComplete ? { rampComplete: true } : {})
   };
+  next.bpm = getPlaybackBpm(next, normalized);
+  return next;
 }
 
 export function advancePlaybackRuntime(runtime, blocks) {
@@ -608,11 +714,17 @@ function normalizePlaybackBlock(block, index) {
     return null;
   }
 
+  const ramp = validateTempoRamp(block.ramp, { bpm: block.bpm, measures: block.measures });
+  if (!ramp.ok) {
+    return null;
+  }
+
   return {
     id: stableId(block.id, () => `part-${index + 1}`),
     name: parsedName.value,
     measures: block.measures,
     bpm: block.bpm,
+    ...(ramp.ramp ? { ramp: ramp.ramp } : {}),
     order: Number.isInteger(block.order) ? block.order : index
   };
 }

@@ -1,6 +1,6 @@
 import { getSession, login, logout, registerAccount } from './api.js?v=tools-only-20261012';
 import { createAudioCoordinator } from './audio-coordinator.js';
-import { initMetronome } from './metronome-editor.js?v=redesign13-20260730';
+import { initMetronome } from './metronome-editor.js?v=songbook-20261012';
 import { initToolNavigation } from './navigation.js?v=tools-only-20261012';
 import { initTruco } from './truco.js?v=joint-access-20260805';
 import { initTuner } from './tuner.js?v=redesign13-20260730';
@@ -178,6 +178,7 @@ async function handleLogout() {
   }
   {
     state.user = null;
+    state.tools.metronome?.setSession?.({ authenticated: false });
     chat?.destroy();
     forgetLocalProfile();
     clearLocalStorageUser();
@@ -230,13 +231,14 @@ async function showApp(user, { offline = false } = {}) {
 function initLocalTools(user) {
   if (state.tools.initialized) {
     state.tools.truco?.setAuthenticatedUser?.(user);
+    state.tools.metronome?.setSession?.({ authenticated: !localMode });
     return;
   }
 
   const audioCoordinator = createAudioCoordinator();
   state.tools.truco = initToolSafely('truco', () => initTruco(document.querySelector('#truco-tool'), user));
   state.tools.metronome = initToolSafely('metrónomo', () =>
-    initMetronome(document.querySelector('#metronome-tool'), audioCoordinator)
+    initMetronome(document.querySelector('#metronome-tool'), audioCoordinator, { authenticated: !localMode })
   );
   state.tools.tuner = initToolSafely('afinador', () => initTuner(document.querySelector('#tuner-tool'), audioCoordinator));
   state.tools.initialized = true;
