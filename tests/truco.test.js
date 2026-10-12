@@ -476,7 +476,7 @@ describe('Truco a 30', () => {
 
     expect(html).toContain('/js/app.js?v=tuner-20261012');
     expect(app).toContain("./truco.js?v=joint-access-20260805");
-    expect(serviceWorker).toContain("budines-shell-v39-tuner");
+    expect(serviceWorker).toContain("budines-shell-v40-tuner");
     expect(serviceWorker).toContain('/js/app.js?v=tuner-20261012');
     expect(serviceWorker).toContain('/js/truco.js?v=joint-access-20260805');
   });

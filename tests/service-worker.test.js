@@ -61,3 +61,20 @@ it('actualizar el shell elimina versiones anteriores y conserva caches ajenos', 
   expect(deleted).toEqual(['budines-shell-v36-offline-chat', 'budines-shell-v37-tools-only']);
   expect(claimed).toBe(true);
 });
+
+it('instalar una versión descarga el shell sin reutilizar respuestas HTTP anteriores', async () => {
+  const { sandbox, handlers } = worker();
+  const requests = [];
+  sandbox.Request = class {
+    constructor(url, options) { this.url = url; this.cache = options.cache; }
+  };
+  sandbox.caches = { open: async () => ({ addAll: async entries => { requests.push(...entries); } }) };
+  let waitingSkipped = false;
+  sandbox.self.skipWaiting = () => { waitingSkipped = true; };
+  let installation;
+  handlers.install({ waitUntil: promise => { installation = promise; } });
+  await installation;
+  expect(requests.map(request => request.url)).toEqual(sandbox.assets);
+  expect(requests.every(request => request.cache === 'reload')).toBe(true);
+  expect(waitingSkipped).toBe(true);
+});

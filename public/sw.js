@@ -1,4 +1,4 @@
-const CACHE_NAME = 'budines-shell-v39-tuner';
+const CACHE_NAME = 'budines-shell-v40-tuner';
 const SHELL_ASSETS = [
   '/',
   '/styles.css?v=tuner-20261012',
@@ -34,7 +34,8 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches
       .open(CACHE_NAME)
-      .then((cache) => cache.addAll(SHELL_ASSETS))
+      // Fetch the new shell afresh even when a previous page populated HTTP cache.
+      .then((cache) => cache.addAll(SHELL_ASSETS.map((url) => new Request(url, { cache: 'reload' }))))
       .then(() => self.skipWaiting())
   );
 });
